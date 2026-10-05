@@ -153,7 +153,10 @@ header.topbar {
   background: var(--bg-1);
   border-bottom: 1px solid var(--border);
   z-index: 40;
+  overflow-x: auto;
+  scrollbar-width: none;
 }
+header.topbar::-webkit-scrollbar { display: none; }
 .brand {
   display: flex;
   align-items: center;
@@ -174,7 +177,7 @@ header.topbar {
 .brand-logo svg { width: 16px; height: 16px; }
 .brand small { color: var(--text-3); font-weight: 500; margin-left: 2px; }
 
-.topbar-actions { display: flex; gap: 8px; margin-left: 8px; }
+.topbar-actions { display: flex; gap: 8px; margin-left: 8px; flex-shrink: 0; }
 
 .btn {
   display: inline-flex;
@@ -634,6 +637,19 @@ html[data-theme="light"] .cm-s-default .cm-builtin { color: #b45309; }
 }
 .field .hint { font-size: 11.5px; color: var(--text-3); margin-top: 4px; }
 
+/* Firmware y biblioteca de ejemplos */
+.notice-box { padding: 11px 13px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg-2); font-size: 12px; line-height: 1.5; color: var(--text-2); margin-bottom: 14px; }
+.notice-box a { color: var(--accent); }
+.notice-box strong { color: var(--text); }
+.firmware-log { height: 108px; overflow: auto; background: var(--bg-3); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 8px; white-space: pre-wrap; overflow-wrap: anywhere; font: 11px/1.5 var(--font-mono); color: var(--text-2); }
+.firmware-progress { width: 100%; height: 12px; margin: 8px 0; accent-color: var(--accent); }
+.firmware-status { min-height: 36px; font-size: 12px; color: var(--text-2); }
+.examples-list { display: grid; gap: 8px; }
+.example-item { text-align: left; display: flex; align-items: flex-start; gap: 10px; padding: 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); background: var(--bg-2); cursor: pointer; font: inherit; }
+.example-item:hover, .example-item:focus-visible { border-color: var(--accent); background: var(--accent-soft); }
+.example-item svg { width: 18px; flex-shrink: 0; }
+.example-item small { display: block; font-size: 11.5px; color: var(--text-3); margin-top: 4px; line-height: 1.45; }
+
 /* Command palette */
 .cmd-list { max-height: 50vh; overflow-y: auto; padding: 6px; }
 .cmd-item {
@@ -736,15 +752,18 @@ html[data-theme="light"] .cm-s-default .cm-builtin { color: #b45309; }
 @media (max-width: 900px) {
   :root { --sidebar-w: 200px; }
   .term-panel { height: 220px; }
+  .topbar-actions .btn span { display: none; }
+  .topbar-actions .btn { padding: 0; width: 34px; justify-content: center; }
 }
 @media (max-width: 640px) {
   .workspace { grid-template-columns: 1fr; }
   .sidebar { display: none; }
-  .topbar-actions .btn span { display: none; }
-  .topbar-actions .btn { padding: 0; width: 34px; justify-content: center; }
+  header.topbar { gap: 6px; padding: 0 8px; }
+  .brand { font-size: 0; gap: 0; flex-shrink: 0; }
+  .brand small { display: none; }
+  .topbar-actions { gap: 4px; margin-left: 0; }
 }
 </style>
-<base target="_blank">
 </head>
 
 <body>
@@ -775,6 +794,12 @@ html[data-theme="light"] .cm-s-default .cm-builtin { color: #b45309; }
       </button>
       <button class="btn" id="btnReset" disabled title="Reiniciar placa (Ctrl+R)">
         <i data-lucide="rotate-ccw"></i><span>Reset</span>
+      </button>
+      <button class="btn" id="btnFirmware" title="Instalar MicroPython desde el navegador" aria-label="Instalar MicroPython">
+        <i data-lucide="cpu"></i><span>Firmware</span>
+      </button>
+      <button class="btn" id="btnExamples" title="Ejemplos MicroPython para ESP32" aria-label="Abrir ejemplos MicroPython">
+        <i data-lucide="book-open"></i><span>Ejemplos</span>
       </button>
     </div>
 
@@ -877,7 +902,7 @@ html[data-theme="light"] .cm-s-default .cm-builtin { color: #b45309; }
     </div>
     <div class="status-item">
       <i data-lucide="info"></i>
-      <span id="versionText">v1.0</span>
+      <span id="versionText">v2.0.0</span>
     </div>
   </footer>
 </div>
@@ -995,6 +1020,67 @@ html[data-theme="light"] .cm-s-default .cm-builtin { color: #b45309; }
 
 
 <!-- ======================= DOCUMENTACIÓN (README + LICENCIA) ======================= -->
+<div class="overlay hidden" id="firmwareOverlay" role="dialog" aria-modal="true" aria-labelledby="firmwareTitle">
+  <div class="modal" style="width:min(640px,94vw)">
+    <div class="modal-header">
+      <div class="title" id="firmwareTitle"><i data-lucide="cpu"></i> Instalar MicroPython</div>
+      <button class="icon-btn" id="btnFirmwareClose" title="Cerrar"><i data-lucide="x"></i></button>
+    </div>
+    <div class="modal-body">
+      <div class="notice-box">
+        <strong>1.</strong> Descarga el firmware estable <strong>.bin</strong> de MicroPython para tu placa (archivo completo, no <code>.app-bin</code>).<br>
+        <strong>2.</strong> Selecciónalo aquí, confirma la operación y autoriza el puerto USB. La escritura se realiza en tu navegador con esptool-js.<br>
+        <strong>3.</strong> Al terminar, pulsa <strong>Conectar</strong> en el IDE. Si no entra al modo de descarga, mantén BOOT y pulsa RESET en la placa.
+      </div>
+      <div class="field">
+        <label for="firmwareBoard">Familia de placa</label>
+        <select id="firmwareBoard">
+          <option value="c3">ESP32-C3 / C3 Super Mini — 0x0</option>
+          <option value="esp32">ESP32 clásico / WROOM — 0x1000</option>
+          <option value="s3">ESP32-S3 — 0x0</option>
+        </select>
+        <div class="hint">Comprueba el modelo serigrafiado. La aplicación también verifica el chip detectado antes de grabar.</div>
+      </div>
+      <div class="field">
+        <a id="firmwareOfficialLink" href="https://micropython.org/download/ESP32_GENERIC_C3/" target="_blank" rel="noopener noreferrer">Abrir descarga oficial de MicroPython para ESP32-C3 ↗</a>
+      </div>
+      <div class="field">
+        <label for="firmwareFile">Firmware .bin descargado</label>
+        <input type="file" id="firmwareFile" accept=".bin,application/octet-stream">
+        <div id="firmwareFileInfo" class="hint">Ningún archivo seleccionado.</div>
+      </div>
+      <div class="field">
+        <label><input type="checkbox" id="firmwareErase"> Borrar completamente la flash antes de instalar</label>
+        <div class="hint">Recomendado para una instalación inicial. Elimina <code>main.py</code>, <code>boot.py</code> y todos los demás archivos de la placa.</div>
+      </div>
+      <div class="field">
+        <label><input type="checkbox" id="firmwareAcknowledged"> Comprendí que la instalación modifica el firmware y que debo elegir el archivo correcto para mi placa.</label>
+      </div>
+      <div id="firmwareStatus" class="firmware-status" role="status" aria-live="polite">Selecciona el firmware oficial correspondiente.</div>
+      <progress id="firmwareProgress" class="firmware-progress" max="100" value="0" aria-label="Progreso de instalación"></progress>
+      <div id="firmwareLog" class="firmware-log" role="log" aria-label="Registro de instalación"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" id="btnFirmwareCancel">Cerrar</button>
+      <button class="btn primary" id="btnFirmwareFlash" disabled>Instalar MicroPython</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay hidden" id="examplesOverlay" role="dialog" aria-modal="true" aria-labelledby="examplesTitle">
+  <div class="modal" style="width:min(620px,94vw)">
+    <div class="modal-header">
+      <div class="title" id="examplesTitle"><i data-lucide="book-open"></i> Ejemplos ESP32 / MicroPython</div>
+      <button class="icon-btn" data-close="examplesOverlay" title="Cerrar"><i data-lucide="x"></i></button>
+    </div>
+    <div class="modal-body">
+      <div class="notice-box">Cada ejemplo se abre en una pestaña local editable. Puedes ejecutarlo con F5 o guardarlo en la placa con Ctrl+S. Cambia los marcadores de SSID y clave antes de conectar a una red.</div>
+      <div class="examples-list" id="examplesList"></div>
+    </div>
+    <div class="modal-footer"><button class="btn" data-close="examplesOverlay">Cerrar</button></div>
+  </div>
+</div>
+
 <div class="overlay hidden" id="docsOverlay">
   <div class="modal" style="width:min(720px,94vw)">
     <div class="modal-header">
@@ -1021,9 +1107,121 @@ html[data-theme="light"] .cm-s-default .cm-builtin { color: #b45309; }
 <!-- ======================= FILE INPUT (hidden) ======================= -->
 <input type="file" id="fileInput" class="hidden" accept=".py,.txt,.json,.csv,.html,.css,.js,.md,.xml">
 
+<!-- Los ejemplos viven en el mismo HTML: no se ejecutan en el navegador. -->
+<script type="text/x-micropython" id="example-ap">
+import network
+
+# Cambia el nombre y la clave (8 caracteres como minimo).
+ap = network.WLAN(network.WLAN.IF_AP)
+ap.config(ssid="ESP32-C3-Aula", key="CambiaEstaClave123")
+ap.active(True)
+print("Punto de acceso:", ap.config("ssid"))
+print("Dirección IP:", ap.ifconfig()[0])
+# Este ejemplo deja el AP activo hasta reiniciar o desactivarlo.
+</script>
+
+<script type="text/x-micropython" id="example-sta">
+import network
+import time
+
+SSID = "TU_RED_WIFI"
+CLAVE = "TU_CLAVE"
+sta = network.WLAN(network.WLAN.IF_STA)
+sta.active(True)
+if not sta.isconnected():
+    sta.connect(SSID, CLAVE)
+    inicio = time.ticks_ms()
+    while not sta.isconnected() and time.ticks_diff(time.ticks_ms(), inicio) < 15000:
+        time.sleep_ms(250)
+if sta.isconnected():
+    print("Conectado. IP:", sta.ifconfig()[0])
+    print("RSSI:", sta.status("rssi"), "dBm")
+else:
+    print("No se conectó. Estado:", sta.status())
+    sta.disconnect()
+</script>
+
+<script type="text/x-micropython" id="example-scan">
+import network
+
+sta = network.WLAN(network.WLAN.IF_STA)
+sta.active(True)
+print("Explorando redes Wi-Fi cercanas...")
+for ssid, bssid, canal, rssi, seguridad, oculta in sta.scan():
+    nombre = ssid.decode("utf-8") if ssid else "(oculta)"
+    print("SSID:", nombre, "| Canal:", canal, "| RSSI:", rssi, "dBm")
+# El RSSI se mide en la placa, no en el navegador.
+</script>
+
+<script type="text/x-micropython" id="example-rssi">
+import network
+import time
+
+# La placa debe estar conectada previamente como estación.
+sta = network.WLAN(network.WLAN.IF_STA)
+if not sta.isconnected():
+    print("Primero ejecuta el ejemplo Modo STA y configura tu red.")
+else:
+    for medicion in range(10):
+        if not sta.isconnected():
+            print("Se perdió la conexión.")
+            break
+        print("Muestra", medicion + 1, ": RSSI =", sta.status("rssi"), "dBm")
+        time.sleep(1)
+</script>
+
+<script type="text/x-micropython" id="example-diag">
+import os
+import gc
+import machine
+import network
+
+print("Placa:", os.uname().machine)
+print("Firmware:", os.uname().version)
+gc.collect()
+print("RAM libre:", gc.mem_free(), "bytes")
+print("CPU:", machine.freq(), "Hz")
+sta = network.WLAN(network.WLAN.IF_STA)
+print("Wi-Fi conectado:", sta.isconnected())
+if sta.isconnected():
+    print("IP:", sta.ifconfig()[0])
+    print("RSSI:", sta.status("rssi"), "dBm")
+</script>
+
+<script type="text/x-micropython" id="example-led">
+from machine import Pin
+import time
+
+# Muchas C3 Super Mini usan GPIO8 con LED activo en nivel bajo.
+# Comprueba el pin y la polaridad de tu modelo antes de ejecutarlo.
+led = Pin(8, Pin.OUT, value=1)
+for i in range(5):
+    led.value(0)
+    time.sleep_ms(400)
+    led.value(1)
+    time.sleep_ms(400)
+print("Fin de la prueba del LED.")
+</script>
+
+<script type="text/x-micropython" id="example-uart">
+from machine import Pin, UART
+import time
+
+# Ejemplo para conectar con otro dispositivo: TX=GPIO4, RX=GPIO5.
+# Une TX a RX del otro dispositivo y conecta GND con GND.
+# Verifica niveles lógicos compatibles (3,3 V).
+uart = UART(1, baudrate=115200, tx=Pin(4), rx=Pin(5))
+uart.write("PING\n")
+for i in range(20):
+    if uart.any():
+        print("Recibido:", uart.readline())
+    time.sleep_ms(250)
+uart.deinit()
+</script>
+
 <script>
 /* ============================================================================
-   EspWebStudio v1.0.2 — IDE MicroPython para ESP32
+   EspWebStudio v2.0.0 — IDE MicroPython para ESP32
    ---------------------------------------------------------------------------
    100% cliente. Sin backend. Web Serial API + CodeMirror 5 + xterm.js.
    Licencia: MIT
@@ -1039,6 +1237,16 @@ const $$ = (sel, ctx=document) => [...ctx.querySelectorAll(sel)];
 const enc = new TextEncoder();
 const dec = new TextDecoder();
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+function bytesAsLatin1(bytes) {
+  let result = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) {
+    result += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  }
+  return result;
+}
+function decodeRawText(binaryString) {
+  return new TextDecoder().decode(Uint8Array.from(binaryString, ch => ch.charCodeAt(0)));
+}
 
 const escapeHtml = (s) => String(s).replace(/[&<>"']/g, c =>
   ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
@@ -1064,10 +1272,12 @@ function openOverlay(id)  { $('#'+id).classList.remove('hidden'); }
 function closeOverlay(id) { $('#'+id).classList.add('hidden'); }
 $$('[data-close]').forEach(b => b.addEventListener('click', () => closeOverlay(b.dataset.close)));
 $$('.overlay').forEach(ov => ov.addEventListener('click', e => {
-  if (e.target === ov) ov.classList.add('hidden');
+  if (e.target === ov && ov.dataset.locked !== 'true') ov.classList.add('hidden');
 }));
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') $$('.overlay').forEach(o => o.classList.add('hidden'));
+  if (e.key === 'Escape') $$('.overlay').forEach(o => {
+    if (o.dataset.locked !== 'true') o.classList.add('hidden');
+  });
 });
 
 /* ============================================================================
@@ -1113,6 +1323,8 @@ class SerialManager {
     this.reader = null;
     this.connected = false;
     this.mode = 'idle';           // 'idle' | 'terminal' | 'raw'
+    this.rawStage = 'idle';       // 'input' | 'result'
+    this.rawPaste = false;
     this.rawBuffer = '';
     this.rawResolver = null;
     this.rawRejecter = null;
@@ -1141,7 +1353,7 @@ class SerialManager {
     this._readLoop();
   }
   async disconnect() {
-    if (!this.connected) return;
+    if (!this.port) return;
     this.connected = false;
     try { this._rejectRaw(new Error('Desconectado')); } catch {}
     try { await this.writer.write(enc.encode('\x02')); } catch {}
@@ -1151,12 +1363,17 @@ class SerialManager {
     try { await this.port?.close(); } catch {}
     this.writer = this.reader = this.port = null;
     this.mode = 'idle';
+    this.rawStage = 'idle';
     this.emit('state', { connected: false });
   }
 
   async write(str) {
-    if (!this.writer) return;
+    if (!this.writer) throw new Error('Puerto serie no disponible');
     await this.writer.write(enc.encode(str));
+  }
+  async writeBytes(bytes) {
+    if (!this.writer) throw new Error('Puerto serie no disponible');
+    await this.writer.write(bytes);
   }
 
   async _readLoop() {
@@ -1164,12 +1381,13 @@ class SerialManager {
       while (this.connected) {
         const { value, done } = await this.reader.read();
         if (done) break;
-        if (value) this._handleData(dec.decode(value, { stream: true }));
+        if (value) this._handleData(this.mode === 'raw'
+          ? bytesAsLatin1(value) : dec.decode(value, { stream: true }));
       }
     } catch { /* puerto desconectado físicamente */ }
     if (this.connected) {
-      this.connected = false;
-      this.mode = 'idle';
+      this._rejectRaw(new Error('Se desconectó el puerto serie'));
+      await this.disconnect();
       this.emit('state', { connected: false, unexpected: true });
     }
   }
@@ -1177,6 +1395,7 @@ class SerialManager {
   _handleData(text) {
     if (this.mode === 'raw') {
       this.rawBuffer += text;
+      if (this.rawStage !== 'result') return;
       const end = this.rawBuffer.indexOf('\x04>');
       if (end !== -1) {
         const payload = this.rawBuffer.slice(0, end);
@@ -1187,16 +1406,17 @@ class SerialManager {
         // El firmware confirma el Ctrl-D con "OK" PEGADO a la salida
         // (documentado en MicroPython: "The Ctrl-D will be acknowledged
         // by 'OK'"). Ej. real: "OKHola Mundo\r\n". Lo descartamos.
-        if (stdout.startsWith('OK') && !stdout.startsWith('OK\r') && !stdout.startsWith('OK\n')) {
+        if (!this.rawPaste && stdout.startsWith('OK')) {
           stdout = stdout.slice(2);
         }
         clearTimeout(this.rawTimer);
         this.rawTimer = null;
         const resolve = this.rawResolver;
         this.rawResolver = this.rawRejecter = null;
+        this.rawStage = 'idle';
         this.mode = 'terminal';
-        this.write('\x02');   // volver al REPL "friendly"
-        resolve?.({ stdout, stderr });
+        this.write('\x02').catch(() => {}); // volver al REPL "friendly"
+        resolve?.({ stdout: decodeRawText(stdout), stderr: decodeRawText(stderr) });
       }
     } else {
       this.emit('data', text);
@@ -1208,6 +1428,7 @@ class SerialManager {
     const reject = this.rawRejecter;
     this.rawResolver = this.rawRejecter = null;
     this.rawBuffer = '';
+    this.rawStage = 'idle';
     if (this.mode === 'raw') this.mode = 'terminal';
     reject?.(err);
   }
@@ -1215,43 +1436,102 @@ class SerialManager {
   /* Aborta una ejecución en curso (Raw REPL) y devuelve el control al REPL. */
   async abortRaw() {
     if (this.mode !== 'raw') return;
-    this.write('\x02');       // Ctrl-B: salir de Raw REPL
+    await this.write('\x02'); // Ctrl-B: salir de Raw REPL
     await sleep(60);
-    this.write('\x03');       // Ctrl-C: interrumpir el programa
+    await this.write('\x03'); // Ctrl-C: interrumpir el programa
     this._rejectRaw(new Error('Ejecución interrumpida por el usuario'));
+  }
+
+  async _waitRaw(predicate, timeoutMs=3000) {
+    const start = Date.now();
+    while (this.connected && this.mode === 'raw' && Date.now() - start < timeoutMs) {
+      if (predicate(this.rawBuffer)) return;
+      await sleep(10);
+    }
+    throw new Error('Sin respuesta de MicroPython (Raw REPL)');
   }
 
   async rawExec(code, timeoutMs = 8000) {
     if (!this.connected) throw new Error('Sin conexión');
-    if (this.mode === 'raw') { await this.write('\x02'); await sleep(80); }
-
+    if (this.mode === 'raw') throw new Error('Ya hay otra operación serie en curso');
     this.mode = 'raw';
+    this.rawStage = 'input';
+    this.rawPaste = false;
     this.rawBuffer = '';
-    await this.write('\x01');     // Ctrl-A → Raw REPL
+    try {
+      await this.write('\x03\x01'); // Detener main.py si estaba activo y entrar en Raw REPL.
+      await this._waitRaw(buffer => /raw REPL;[^\r\n]*\r?\n>/.test(buffer), 4000);
+      this.rawBuffer = '';
 
-    const t0 = Date.now();
-    while (Date.now() - t0 < 2500) {
-      if (this.rawBuffer.includes('raw REPL') && this.rawBuffer.includes('>')) break;
-      await sleep(10);
+      // Raw-paste permite transferir programas grandes con control de flujo.
+      await this.write('\x05A\x01');
+      await this._waitRaw(buffer => buffer.length >= 2, 2500);
+      const response = this.rawBuffer.slice(0, 2);
+      this.rawBuffer = this.rawBuffer.slice(2);
+      if (response === 'R\x01') {
+        this.rawPaste = true;
+        await this._waitRaw(buffer => buffer.length >= 2);
+        const windowSize = this.rawBuffer.charCodeAt(0) + 256 * this.rawBuffer.charCodeAt(1);
+        this.rawBuffer = this.rawBuffer.slice(2);
+        if (windowSize < 1 || windowSize > 8192) throw new Error('Ventana Raw-paste inválida');
+        const bytes = enc.encode(code);
+        let offset = 0, available = windowSize;
+        while (offset < bytes.length) {
+          while (this.rawBuffer.length && (this.rawBuffer.charCodeAt(0) === 1 || this.rawBuffer.charCodeAt(0) === 4)) {
+            const signal = this.rawBuffer.charCodeAt(0);
+            this.rawBuffer = this.rawBuffer.slice(1);
+            if (signal === 4) throw new Error('La placa rechazó el código antes de completarlo');
+            available += windowSize;
+          }
+          if (available === 0) {
+            await this._waitRaw(buffer => buffer.length > 0, 5000);
+            continue;
+          }
+          const part = bytes.subarray(offset, offset + Math.min(available, 128, bytes.length - offset));
+          await this.writeBytes(part);
+          offset += part.length;
+          available -= part.length;
+        }
+        await this.write('\x04');
+        // Durante el cierre pueden llegar créditos de flujo y luego el ACK \x04.
+        while (true) {
+          await this._waitRaw(buffer => buffer.length > 0, 5000);
+          const signal = this.rawBuffer.charCodeAt(0);
+          this.rawBuffer = this.rawBuffer.slice(1);
+          if (signal === 4) break;
+          if (signal !== 1) throw new Error('Respuesta Raw-paste inesperada');
+        }
+      } else {
+        if (response === 'ra') {
+          await this._waitRaw(buffer => buffer.includes('>'), 2500);
+          this.rawBuffer = '';
+        } else if (response !== 'R\x00') {
+          throw new Error('Respuesta Raw REPL inesperada');
+        }
+        const bytes = enc.encode(code);
+        for (let offset = 0; offset < bytes.length; offset += 256) {
+          await this.writeBytes(bytes.subarray(offset, offset + 256));
+          await sleep(10);
+        }
+        await this.write('\x04');
+      }
+      this.rawStage = 'result';
+      // La salida puede haber llegado antes de instalar el resolver.
+      return await new Promise((resolve, reject) => {
+        this.rawResolver = resolve;
+        this.rawRejecter = reject;
+        this.rawTimer = setTimeout(() => {
+          this._rejectRaw(new Error('Tiempo de espera agotado (Raw REPL)'));
+        }, timeoutMs);
+        this._handleData('');
+      });
+    } catch (error) {
+      if (this.mode === 'raw') {
+        this._rejectRaw(error);
+        try { await this.write('\x02\x03'); } catch {}
+      }
+      throw error;
     }
-    // Drenar bytes rezagados del banner (prompt partido en varios chunks)
-    let lastLen = -1;
-    const t1 = Date.now();
-    while (Date.now() - t1 < 300) {
-      await sleep(30);
-      if (this.rawBuffer.length === lastLen) break;
-      lastLen = this.rawBuffer.length;
-    }
-    this.rawBuffer = '';
-
-    return new Promise((resolve, reject) => {
-      this.rawResolver = resolve;
-      this.rawRejecter = reject;
-      this.rawTimer = setTimeout(() => {
-        this._rejectRaw(new Error('Tiempo de espera agotado (Raw REPL)'));
-      }, timeoutMs);
-      this.write(code + '\x04');  // código + Ctrl-D
-    });
   }
 
   async interrupt()  { if (this.connected) await this.write('\x03'); }
@@ -1265,6 +1545,7 @@ class SerialManager {
 }
 
 const serial = new SerialManager();
+let firmwareBusy = false;
 
 /* ============================================================================
    4. TERMINAL (xterm.js)
@@ -1297,7 +1578,7 @@ term.onData(data => {
 });
 window.addEventListener('resize', () => fitAddon.fit());
 
-term.writeln('\x1b[1;36m  EspWebStudio v1.0.2\x1b[0m');
+term.writeln('\x1b[1;36m  EspWebStudio v2.0.0\x1b[0m');
 term.writeln('\x1b[90m  IDE MicroPython para placas ESP32 (C3, S3, clásico…)\x1b[0m');
 term.writeln('');
 term.writeln('\x1b[33m▸ Conecta tu placa por USB con Chrome o Edge (Web Serial API)\x1b[0m');
@@ -1314,13 +1595,13 @@ function logOutput(text, kind='line') {
 }
 
 function switchTermTab(tab) {
-  $$('.term-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+  $$('.term-header .term-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
   $('#xterm').classList.toggle('hidden', tab !== 'repl');
   $('#outputPane').classList.toggle('hidden', tab !== 'output');
   if (tab === 'repl') setTimeout(() => fitAddon.fit(), 30);
   else term.blur();
 }
-$$('.term-tab').forEach(t => t.addEventListener('click', () => switchTermTab(t.dataset.tab)));
+$$('.term-header .term-tab').forEach(t => t.addEventListener('click', () => switchTermTab(t.dataset.tab)));
 
 /* ============================================================================
    5. EDITOR (CodeMirror 5)
@@ -1465,7 +1746,6 @@ function activateDoc(id) {
   cm.setValue(doc.content || '');
   cm.clearHistory();
   cm.setCursor(0, 0);
-  doc.dirty = false;
   renderTabs();
   updateEditorMode();
   if (!doc.isLocal) highlightActiveFile(doc.devicePath || doc.name);
@@ -1918,17 +2198,25 @@ function setBusy(busy, text) {
 
 function updateStatusBar() {
   const dot = $('#statusDot');
+  if (firmwareBusy) {
+    dot.classList.add('busy');
+    $('#statusText').textContent = 'Instalando firmware…';
+  } else {
+    dot.classList.remove('busy');
+  }
   if (serial.connected) {
     dot.classList.add('online');
-    $('#statusText').textContent = state.running ? 'Ejecutando…' : 'Conectado';
+    if (!firmwareBusy) $('#statusText').textContent = state.running ? 'Ejecutando…' : 'Conectado';
   } else {
     dot.classList.remove('online');
-    $('#statusText').textContent = 'Desconectado';
+    if (!firmwareBusy) $('#statusText').textContent = 'Desconectado';
   }
   $('#baudText').textContent = `${settings.baud} baud`;
   ['btnRun','btnSave','btnSaveAs','btnInterrupt','btnReset'].forEach(id => {
-    $('#'+id).disabled = !serial.connected;
+    $('#'+id).disabled = !serial.connected || firmwareBusy;
   });
+  $('#btnConnect').disabled = firmwareBusy;
+  $('#btnFirmware').disabled = firmwareBusy;
   const btnC = $('#btnConnect');
   if (serial.connected) {
     btnC.classList.remove('primary');
@@ -1947,10 +2235,229 @@ serial.on('state', ({ connected, unexpected }) => {
   if (!connected) {
     sidebarDisconnected();
     $('#chipText').textContent = 'ESP32';
-    $('#versionText').textContent = 'v1.0.2';
+    $('#versionText').textContent = 'v2.0.0';
     if (unexpected) toast('La placa se desconectó (¿USB desenchufado?)', 'error', 5000);
   }
 });
+
+/* ============================================================================
+   10b. INSTALACIÓN DE FIRMWARE (ESPTOOL-JS / WEB SERIAL)
+   ============================================================================ */
+const FIRMWARE_PROFILES = {
+  c3: {
+    label: 'ESP32-C3', chip: /^ESP32-C3\b/i, address: 0x0,
+    url: 'https://micropython.org/download/ESP32_GENERIC_C3/'
+  },
+  esp32: {
+    label: 'ESP32 clásico', chip: /^ESP32(?![-\w])/i, address: 0x1000,
+    url: 'https://micropython.org/download/ESP32_GENERIC/'
+  },
+  s3: {
+    label: 'ESP32-S3', chip: /^ESP32-S3\b/i, address: 0x0,
+    url: 'https://micropython.org/download/ESP32_GENERIC_S3/'
+  }
+};
+const ESPTOOL_MODULE = 'https://unpkg.com/esptool-js@0.7.0/bundle.js';
+
+function flashLog(message) {
+  const box = $('#firmwareLog');
+  box.textContent = (box.textContent + String(message) + '\n').slice(-16000);
+  box.scrollTop = box.scrollHeight;
+}
+function flashStatus(message) { $('#firmwareStatus').textContent = message; }
+function updateFirmwareForm() {
+  const profile = FIRMWARE_PROFILES[$('#firmwareBoard').value];
+  const link = $('#firmwareOfficialLink');
+  link.href = profile.url;
+  link.textContent = 'Abrir descarga oficial de MicroPython para ' + profile.label + ' ↗';
+  const file = $('#firmwareFile').files[0];
+  $('#firmwareFileInfo').textContent = file
+    ? file.name + ' · ' + Math.ceil(file.size / 1024) + ' KiB'
+    : 'Ningún archivo seleccionado.';
+  $('#btnFirmwareFlash').disabled = firmwareBusy || !file || !$('#firmwareAcknowledged').checked
+    || !('serial' in navigator) || !window.isSecureContext;
+}
+function openFirmware() {
+  updateFirmwareForm();
+  if (!('serial' in navigator) || !window.isSecureContext) {
+    flashStatus('Necesitas Chrome o Edge de escritorio en HTTPS (GitHub Pages) y acceso USB.');
+  }
+  openOverlay('firmwareOverlay');
+}
+function setFirmwareBusy(busy) {
+  firmwareBusy = busy;
+  $('#firmwareOverlay').dataset.locked = String(busy);
+  ['btnFirmwareClose', 'btnFirmwareCancel', 'firmwareBoard', 'firmwareFile',
+   'firmwareErase', 'firmwareAcknowledged'].forEach(id => { $('#'+id).disabled = busy; });
+  updateFirmwareForm();
+  updateStatusBar();
+}
+function closeFirmware() {
+  if (!firmwareBusy) closeOverlay('firmwareOverlay');
+}
+function validateFirmware(file, bytes, selectedBoard) {
+  if (!/\.bin$/i.test(file.name) || /\.app-bin$/i.test(file.name)) {
+    throw new Error('Selecciona el .bin completo, no un .app-bin ni un .uf2.');
+  }
+  if (bytes.length < 65536 || bytes.length > 16 * 1024 * 1024 || bytes[0] !== 0xe9) {
+    throw new Error('El archivo no parece una imagen de firmware ESP válida.');
+  }
+  const known = /ESP32[_-]GENERIC(?:[_-](C3|S3))?/i.exec(file.name);
+  if (known) {
+    const namedBoard = known[1] ? known[1].toLowerCase() : 'esp32';
+    if (namedBoard !== selectedBoard) {
+      throw new Error('El nombre del firmware corresponde a otra familia de ESP32.');
+    }
+  }
+}
+async function runFirmwareFlash() {
+  if (firmwareBusy || !('serial' in navigator) || !window.isSecureContext) return;
+  const file = $('#firmwareFile').files[0];
+  if (!file || !$('#firmwareAcknowledged').checked) return;
+  const board = $('#firmwareBoard').value;
+  const profile = FIRMWARE_PROFILES[board];
+  const eraseAll = $('#firmwareErase').checked;
+  let transport = null;
+  let succeeded = false;
+  let writeStarted = false;
+  setFirmwareBusy(true);
+  $('#firmwareProgress').value = 0;
+  $('#firmwareLog').textContent = '';
+  flashStatus('Autoriza el puerto USB de la placa…');
+  try {
+    // requestPort debe ocurrir directamente en el clic, antes de importar módulos o leer archivos.
+    const port = serial.connected ? serial.port : await navigator.serial.requestPort();
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    validateFirmware(file, bytes, board);
+    flashLog('Archivo: ' + file.name + ' (' + bytes.length + ' bytes)');
+    flashLog('Perfil: ' + profile.label + ', dirección 0x' + profile.address.toString(16));
+    flashStatus('Cargando la biblioteca de flasheo…');
+    const { ESPLoader, Transport } = await import(ESPTOOL_MODULE);
+    if (!ESPLoader || !Transport) throw new Error('No se pudo cargar esptool-js desde el CDN.');
+
+    if (serial.connected) {
+      flashLog('Liberando el puerto del IDE para usar el cargador de firmware…');
+      await serial.disconnect();
+      sidebarDisconnected();
+    }
+    transport = new Transport(port, false);
+    const loader = new ESPLoader({
+      transport, baudrate: 115200, romBaudrate: 115200,
+      terminal: {
+        clean() {},
+        write(data) { if (String(data).trim()) flashLog(data); },
+        writeLine(data) { flashLog(data); }
+      }
+    });
+    flashStatus('Detectando el chip de la placa…');
+    const chipName = String(await loader.main());
+    flashLog('Chip detectado: ' + chipName);
+    if (!profile.chip.test(chipName)) {
+      throw new Error('La placa detectada (' + chipName + ') no coincide con el perfil ' + profile.label + '. No se ha grabado nada.');
+    }
+    const flashSize = await loader.detectFlashSize();
+    if (!flashSize || !/^\d+(?:KB|MB)$/.test(flashSize)) {
+      throw new Error('No se pudo detectar la capacidad de la flash. No se ha grabado nada.');
+    }
+    const capacity = parseInt(flashSize, 10) * (flashSize.endsWith('MB') ? 1048576 : 1024);
+    if (profile.address + bytes.length > capacity) {
+      throw new Error('El firmware supera la capacidad de la flash detectada (' + flashSize + ').');
+    }
+    flashLog('Flash detectada: ' + flashSize + (eraseAll ? ' · borrado completo solicitado' : ''));
+    flashStatus(eraseAll ? 'Borrando la flash y escribiendo MicroPython…' : 'Escribiendo MicroPython…');
+    let lastPercent = -1;
+    writeStarted = true;
+    await loader.writeFlash({
+      fileArray: [{ data: bytes, address: profile.address }],
+      flashMode: 'dio', flashFreq: '40m', flashSize,
+      eraseAll, compress: true,
+      reportProgress(_index, written, total) {
+        const percent = total ? Math.max(0, Math.min(100, Math.floor(written * 100 / total))) : 0;
+        if (percent !== lastPercent) {
+          lastPercent = percent;
+          $('#firmwareProgress').value = percent;
+          flashStatus('Escribiendo MicroPython… ' + percent + '%');
+        }
+      }
+    });
+    succeeded = true;
+    $('#firmwareProgress').value = 100;
+    try {
+      await loader.after('hard_reset');
+      flashStatus('MicroPython instalado. Pulsa Conectar para usar el IDE.');
+    } catch (resetError) {
+      flashLog('Reinicio automático no disponible: ' + resetError.message);
+      flashStatus('Firmware escrito. Reinicia o reconecta la placa y pulsa Conectar.');
+    }
+    flashLog('Instalación completada. Vuelve al IDE y conecta la placa.');
+    toast('MicroPython instalado en ' + chipName, 'success', 6000);
+  } catch (error) {
+    if (error.name === 'NotFoundError') {
+      flashStatus('Selección de puerto cancelada.');
+    } else {
+      flashStatus('No se completó la instalación: ' + error.message
+        + (writeStarted ? ' La flash puede estar incompleta; vuelve a instalar el firmware.' : ''));
+      flashLog('ERROR: ' + error.message);
+      toast('Flasheo: ' + error.message, 'error', 6500);
+    }
+  } finally {
+    if (transport) {
+      try { await transport.disconnect(); } catch (e) { flashLog('Puerto: ' + e.message); }
+    }
+    setFirmwareBusy(false);
+    if (succeeded) $('#firmwareAcknowledged').checked = false;
+    updateFirmwareForm();
+  }
+}
+$('#btnFirmware').addEventListener('click', openFirmware);
+$('#btnFirmwareClose').addEventListener('click', closeFirmware);
+$('#btnFirmwareCancel').addEventListener('click', closeFirmware);
+$('#btnFirmwareFlash').addEventListener('click', runFirmwareFlash);
+['firmwareBoard', 'firmwareFile', 'firmwareAcknowledged'].forEach(id => {
+  $('#'+id).addEventListener('change', updateFirmwareForm);
+});
+
+/* ============================================================================
+   10c. BIBLIOTECA DE EJEMPLOS INTEGRADA
+   ============================================================================ */
+const EXAMPLES = [
+  { id:'ap',   name:'wifi_ap.py',          title:'Modo AP',                  description:'Crea una red Wi-Fi propia con clave y muestra su dirección IP.', icon:'radio-tower' },
+  { id:'sta',  name:'wifi_sta.py',         title:'Modo STA',                 description:'Conecta el ESP32 a tu red y muestra IP y señal recibida.', icon:'wifi' },
+  { id:'scan', name:'wifi_scan_rssi.py',   title:'Escanear redes y RSSI',    description:'Lista redes visibles, canal y potencia de señal en dBm.', icon:'scan-search' },
+  { id:'rssi', name:'wifi_rssi.py',        title:'Monitor de RSSI',         description:'Mide diez veces la señal de la red a la que está conectada la placa.', icon:'activity' },
+  { id:'diag', name:'diagnostico.py',      title:'Diagnóstico de la placa', description:'Muestra firmware, memoria libre, frecuencia y estado Wi-Fi.', icon:'stethoscope' },
+  { id:'led',  name:'led_gpio8.py',        title:'LED de la C3 Super Mini', description:'Ejemplo de GPIO8 con LED activo en bajo; comprueba el pin de tu variante.', icon:'lightbulb' },
+  { id:'uart', name:'uart_gpio4_gpio5.py', title:'Comunicación UART',       description:'Envía PING por GPIO4 y recibe datos por GPIO5 a 115200 baudios.', icon:'cable' }
+];
+function openExamples() {
+  const list = $('#examplesList');
+  list.textContent = '';
+  EXAMPLES.forEach(item => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'example-item';
+    const icon = document.createElement('i');
+    icon.setAttribute('data-lucide', item.icon);
+    const body = document.createElement('span');
+    const title = document.createElement('strong');
+    title.textContent = item.title;
+    const subtitle = document.createElement('small');
+    subtitle.textContent = item.description;
+    body.append(title, subtitle);
+    button.append(icon, body);
+    button.addEventListener('click', () => {
+      const source = $('#example-' + item.id).textContent.trim() + '\n';
+      newDoc(item.name, source, true);
+      closeOverlay('examplesOverlay');
+      toast('Ejemplo abierto: ' + item.name, 'success');
+      cm.focus();
+    });
+    list.appendChild(button);
+  });
+  refreshIcons();
+  openOverlay('examplesOverlay');
+}
+$('#btnExamples').addEventListener('click', openExamples);
 
 /* ============================================================================
    11. MENÚ CONTEXTUAL DEL EXPLORADOR
@@ -2017,8 +2524,7 @@ $('#btnConnect').addEventListener('click', async () => {
       );
       const chip = info.stdout.match(/CHIP:(.+)/)?.[1]?.trim();
       const ver  = info.stdout.match(/VER:(.+)/)?.[1]?.trim();
-      if (chip) $('#chipText').textContent = chip;
-      if (ver)  $('#versionText').textContent = 'MP ' + ver;
+      if (chip) $('#chipText').textContent = chip + (ver ? ' · MP ' + ver : '');
     } catch { /* no crítico */ }
 
     await syncFilesystem(true);
@@ -2115,6 +2621,8 @@ $('#btnSaveSettings').addEventListener('click', () => {
    ============================================================================ */
 const COMMANDS = [
   { id:'connect',   label:'Conectar / Desconectar placa',    icon:'plug',       key:'Ctrl+K',       run: () => $('#btnConnect').click() },
+  { id:'firmware',  label:'Instalar MicroPython (firmware)', icon:'cpu',        key:'',             run: openFirmware },
+  { id:'examples',  label:'Abrir ejemplos ESP32',           icon:'book-open',  key:'',             run: openExamples },
   { id:'run',       label:'Ejecutar en RAM',                 icon:'play',       key:'F5',           run: runInRam },
   { id:'save',      label:'Guardar en la placa',             icon:'save',       key:'Ctrl+S',       run: saveActiveToDevice },
   { id:'saveAs',    label:'Guardar como… (en la placa)',     icon:'save-all',   key:'Ctrl+Shift+S', run: saveActiveAs },
@@ -2239,7 +2747,7 @@ function openAbout() { openDocs('about'); }
 /* ============================================================================
    15b. DOCUMENTACIÓN INTEGRADA (README + LICENCIA)
    ============================================================================ */
-const README_TEXT = `ESPWebStudio — IDE MicroPython para ESP32
+const README_TEXT = `EspWebStudio v2.0.0 — IDE MicroPython para ESP32
 =========================================
 
 IDE web profesional para programar placas ESP32 (C3 Super Mini, S3,
@@ -2263,6 +2771,10 @@ CARACTERISTICAS
 - Paleta de comandos (Ctrl+Shift+P), menu contextual, atajos de teclado.
 - Temas claro/oscuro y ajustes persistentes (localStorage).
 - Reconexion automatica con el ultimo puerto autorizado.
+- Instalacion del firmware MicroPython desde el navegador: Firmware.
+- Biblioteca de ejemplos: AP, STA, escaneo WiFi y RSSI, diagnostico,
+  LED GPIO8 y UART GPIO4/GPIO5.
+- Raw-paste con control de flujo para transferir codigo largo.
 
 
 INICIO RAPIDO
@@ -2276,12 +2788,21 @@ Requisito: navegador con Web Serial API -> Chrome o Edge de ESCRITORIO.
 3) Conecta tu ESP32-C3 por USB y pulsa CONECTAR. Autoriza el puerto.
 
 
-PREPARAR EL ESP32-C3 SUPER MINI
--------------------------------
-1) Instala el firmware MicroPython:
-   https://micropython.org/download/ESP32_GENERIC_C3/
-2) Conecta la placa por USB. Si el puerto esta ocupado por Thonny,
-   el monitor serie u otro programa, cierralo antes de conectar.
+INSTALAR MICROPYTHON DESDE ESTA PAGINA
+--------------------------------------
+1) Pulsa FIRMWARE y elige ESP32-C3, ESP32 clasico o ESP32-S3.
+2) Descarga el firmware .bin COMPLETO desde el enlace oficial mostrado.
+   No uses el archivo .app-bin ni .uf2.
+3) Selecciona el .bin; para una instalacion inicial, puedes marcar
+   BORRAR FLASH (elimina todos los archivos de la placa).
+4) Confirma e instala; autoriza el puerto USB. Tras terminar,
+   vuelve a pulsar CONECTAR en el IDE.
+5) Si no entra en modo descarga: manten BOOT y pulsa RESET.
+
+El instalador comprueba el chip y la capacidad de la flash. Usa la
+direccion 0x0 para C3/S3 y 0x1000 para ESP32 clasico.
+En una PC compartida, cierra cualquier otra aplicacion que use el puerto.
+Necesitas Chrome/Edge de escritorio y HTTPS de GitHub Pages.
 
 
 ATAJOS DE TECLADO
@@ -2302,7 +2823,8 @@ COMO FUNCIONA
 -------------
 - Conexion: Web Serial API (navigator.serial), 115200 baud configurable.
 - Ejecucion y archivos: modo Raw REPL de MicroPython (Ctrl-A / Ctrl-D)
-  con transferencia binaria tolerante via Base64 (ubinascii).
+  y raw-paste con control de flujo; archivos via Base64 (ubinascii).
+- Flasheo: esptool-js 0.7.0 por CDN; firmware .bin elegido por el usuario.
 - Interrupcion: Ctrl-B (salir de Raw REPL) + Ctrl-C al interprete.
 - Sin backend, sin build, sin dependencias locales: solo CDNs.
 
@@ -2348,7 +2870,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 `;
-const ABOUT_TEXT = `EspWebStudio v1.0.2
+const ABOUT_TEXT = `EspWebStudio v2.0.0
 IDE MicroPython para placas ESP32 (C3 Super Mini, S3, clasico...)
 
 Un IDE web 100% cliente, sin backend, que se comunica con tu placa
@@ -2360,8 +2882,11 @@ documentacion (README) y la licencia viven en UN UNICO archivo HTML.
   subir, descargar)
 - Terminal REPL interactiva (xterm.js) + panel de salida capturada
 - Ejecucion en RAM con interrupcion y guardado seguro (Base64)
+- Instalador web de MicroPython (C3, ESP32 y S3)
+- Ejemplos WiFi AP/STA/RSSI, LED, UART y diagnostico
 
-Dependencias (CDN): CodeMirror 5, xterm.js, Lucide Icons.
+Dependencias (CDN): CodeMirror 5, xterm.js, Lucide Icons,
+esptool-js 0.7.0 (Apache-2.0).
 
 Licencia: MIT. Hecho con carino para la comunidad maker.`;
 
@@ -2446,7 +2971,7 @@ document.addEventListener('keydown', e => {
    18. ANTES DE CERRAR LA PÁGINA
    ============================================================================ */
 window.addEventListener('beforeunload', e => {
-  if (state.docs.some(d => d.dirty)) {
+  if (firmwareBusy || state.docs.some(d => d.dirty)) {
     e.preventDefault();
     e.returnValue = '';
   }
