@@ -1,0 +1,2442 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EspWebStudio — IDE MicroPython para ESP32</title>
+<meta name="description" content="IDE web profesional para programar placas ESP32 (C3, S3, clásico) con MicroPython desde el navegador, vía Web Serial API.">
+<meta name="theme-color" content="#0b0d12">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 64 64%27%3E%3Cdefs%3E%3ClinearGradient id=%27g%27 x1=%270%27 y1=%270%27 x2=%271%27 y2=%271%27%3E%3Cstop offset=%270%27 stop-color=%27%233b82f6%27/%3E%3Cstop offset=%271%27 stop-color=%27%238b5cf6%27/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width=%2764%27 height=%2764%27 rx=%2714%27 fill=%27url(%23g)%27/%3E%3Ctext x=%2732%27 y=%2744%27 font-family=%27Arial Black,Arial%27 font-size=%2736%27 font-weight=%27900%27 fill=%27white%27 text-anchor=%27middle%27%3EE%3C/text%3E%3C/svg%3E">
+
+<!-- xterm.js -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.min.css">
+<script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xterm-addon-web-links@0.9.0/lib/xterm-addon-web-links.min.js"></script>
+
+<!-- Lucide icons -->
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+
+<!-- CodeMirror 5 -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/hint/show-hint.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/dialog/dialog.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/fold/foldgutter.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/python/python.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/javascript/javascript.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/xml/xml.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/css/css.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/htmlmixed/htmlmixed.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/markdown/markdown.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/matchbrackets.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/closebrackets.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/trailingspace.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/selection/active-line.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/hint/show-hint.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/search/search.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/search/searchcursor.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/search/jump-to-line.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/dialog/dialog.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/fold/foldcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/fold/foldgutter.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/fold/indent-fold.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/comment/comment.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/display/placeholder.min.js"></script>
+
+<style>
+/* ============================================================
+   THEME SYSTEM
+   ============================================================ */
+:root {
+  --font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Inter", sans-serif;
+  --font-mono: "JetBrains Mono", "Fira Code", Consolas, "SF Mono", Menlo, monospace;
+
+  --accent: #3b82f6;
+  --accent-hover: #2563eb;
+  --accent-soft: rgba(59,130,246,.15);
+  --success: #10b981;
+  --warn: #f59e0b;
+  --danger: #ef4444;
+  --radius: 8px;
+  --radius-sm: 5px;
+  --radius-lg: 12px;
+
+  --header-h: 52px;
+  --status-h: 26px;
+  --tab-h: 36px;
+  --sidebar-w: 260px;
+}
+
+html[data-theme="dark"] {
+  --bg-0: #0b0d12;
+  --bg-1: #12141a;
+  --bg-2: #171a21;
+  --bg-3: #1e222b;
+  --bg-hover: #242833;
+  --bg-active: #2b3040;
+  --bg-elev: #171a21;
+  --border: #262b36;
+  --border-soft: #1e222b;
+  --text: #e6ebf2;
+  --text-2: #97a3b5;
+  --text-3: #5c687a;
+  --shadow-lg: 0 12px 40px rgba(0,0,0,.55);
+  --shadow-sm: 0 2px 8px rgba(0,0,0,.35);
+  --editor-bg: #12141a;
+  --term-bg: #06080c;
+  --scroll-thumb: #2c323d;
+}
+
+html[data-theme="light"] {
+  --bg-0: #f6f7f9;
+  --bg-1: #ffffff;
+  --bg-2: #ffffff;
+  --bg-3: #f3f4f6;
+  --bg-hover: #eef0f4;
+  --bg-active: #e2e6ee;
+  --bg-elev: #ffffff;
+  --border: #e2e5eb;
+  --border-soft: #eef0f4;
+  --text: #1a1f2b;
+  --text-2: #566075;
+  --text-3: #8b93a5;
+  --shadow-lg: 0 12px 40px rgba(20,30,60,.15);
+  --shadow-sm: 0 2px 8px rgba(20,30,60,.08);
+  --editor-bg: #ffffff;
+  --term-bg: #0b0d12;
+  --scroll-thumb: #c8cdd8;
+}
+
+/* ============================================================
+   RESET / BASE
+   ============================================================ */
+*,*::before,*::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+body {
+  font-family: var(--font-ui);
+  background: var(--bg-0);
+  color: var(--text);
+  overflow: hidden;
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+  transition: background .15s ease, color .15s ease;
+}
+button { font-family: inherit; }
+a { color: var(--accent); }
+kbd {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  border-bottom-width: 2px;
+  color: var(--text-2);
+}
+
+/* ============================================================
+   LAYOUT
+   ============================================================ */
+.app {
+  display: grid;
+  grid-template-rows: var(--header-h) 1fr var(--status-h);
+  height: 100vh;
+}
+
+/* HEADER */
+header.topbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 0 14px;
+  background: var(--bg-1);
+  border-bottom: 1px solid var(--border);
+  z-index: 40;
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-weight: 700;
+  font-size: 14.5px;
+  letter-spacing: -.2px;
+  white-space: nowrap;
+}
+.brand-logo {
+  width: 28px; height: 28px;
+  border-radius: 7px;
+  background: linear-gradient(135deg, var(--accent), #8b5cf6);
+  display: flex; align-items: center; justify-content: center;
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(59,130,246,.35);
+}
+.brand-logo svg { width: 16px; height: 16px; }
+.brand small { color: var(--text-3); font-weight: 500; margin-left: 2px; }
+
+.topbar-actions { display: flex; gap: 8px; margin-left: 8px; }
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 13px;
+  height: 34px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-3);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background .12s, border-color .12s, transform .06s;
+  white-space: nowrap;
+}
+.btn:hover:not(:disabled) { background: var(--bg-hover); border-color: var(--border-soft); }
+.btn:active:not(:disabled) { transform: translateY(1px); }
+.btn:disabled { opacity: .4; cursor: not-allowed; }
+.btn svg { width: 15px; height: 15px; flex-shrink: 0; }
+.btn.icon-only { padding: 0; width: 34px; justify-content: center; }
+
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn.primary:hover:not(:disabled) { background: var(--accent-hover); border-color: var(--accent-hover); }
+.btn.danger  { background: var(--danger); border-color: var(--danger); color: #fff; }
+.btn.success { background: var(--success); border-color: var(--success); color: #fff; }
+.btn.ghost   { background: transparent; border-color: transparent; color: var(--text-2); }
+.btn.ghost:hover { background: var(--bg-hover); color: var(--text); }
+
+.topbar-spacer { flex: 1; }
+
+/* MAIN WORKSPACE */
+.workspace {
+  display: grid;
+  grid-template-columns: var(--sidebar-w) 1fr;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* SIDEBAR */
+.sidebar {
+  background: var(--bg-1);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.sidebar-section {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 11px 14px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--text-3);
+}
+.sidebar-section .toolbar { display: flex; gap: 3px; }
+.icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px; height: 26px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  color: var(--text-3);
+  background: transparent;
+  border: none;
+  transition: background .12s, color .12s;
+}
+.icon-btn:hover { background: var(--bg-hover); color: var(--text); }
+.icon-btn svg { width: 14px; height: 14px; }
+
+.file-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 8px 12px;
+  min-height: 0;
+}
+.file-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  cursor: pointer;
+  color: var(--text-2);
+  user-select: none;
+  transition: background .1s, color .1s;
+}
+.file-item:hover { background: var(--bg-hover); color: var(--text); }
+.file-item.active { background: var(--accent-soft); color: var(--text); }
+.file-item.active .file-name { color: var(--accent); font-weight: 600; }
+.file-item .file-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.file-item svg.file-icon { width: 14px; height: 14px; color: var(--text-3); flex-shrink: 0; }
+.file-item.active svg.file-icon { color: var(--accent); }
+.file-item .file-more {
+  opacity: 0;
+  display: flex; gap: 2px;
+  transition: opacity .12s;
+}
+.file-item:hover .file-more, .file-item.active .file-more { opacity: 1; }
+.file-item .file-more .icon-btn { width: 22px; height: 22px; }
+.file-item .file-more .icon-btn svg { width: 12px; height: 12px; }
+
+.empty-state {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--text-3);
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+.empty-state svg { width: 32px; height: 32px; opacity: .35; margin-bottom: 10px; }
+
+.sidebar-footer {
+  padding: 10px 14px;
+  border-top: 1px solid var(--border);
+  font-size: 11.5px;
+  color: var(--text-3);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.sidebar-footer svg { width: 12px; height: 12px; flex-shrink: 0; }
+
+/* MAIN AREA */
+.main-area {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: var(--editor-bg);
+}
+
+/* TABS */
+.tabs-bar {
+  display: flex;
+  align-items: stretch;
+  background: var(--bg-1);
+  border-bottom: 1px solid var(--border);
+  height: var(--tab-h);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.tabs-bar::-webkit-scrollbar { display: none; }
+.tab {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 14px;
+  font-size: 12.5px;
+  color: var(--text-2);
+  border-right: 1px solid var(--border);
+  cursor: pointer;
+  white-space: nowrap;
+  max-width: 220px;
+  position: relative;
+  transition: background .1s, color .1s;
+  border-bottom: 2px solid transparent;
+}
+.tab:hover { background: var(--bg-hover); color: var(--text); }
+.tab.active {
+  background: var(--editor-bg);
+  color: var(--text);
+  border-bottom-color: var(--accent);
+}
+.tab .tab-name { overflow: hidden; text-overflow: ellipsis; }
+.tab .tab-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--warn); flex-shrink: 0;
+  display: none;
+}
+.tab.dirty .tab-dot { display: block; }
+.tab .tab-close {
+  width: 18px; height: 18px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 4px;
+  color: var(--text-3);
+  opacity: 0;
+  transition: opacity .1s, background .1s, color .1s;
+}
+.tab:hover .tab-close, .tab.active .tab-close { opacity: 1; }
+.tab .tab-close:hover { background: var(--bg-active); color: var(--text); }
+.tab .tab-close svg { width: 12px; height: 12px; }
+
+/* EDITOR */
+.editor-wrap { flex: 1; position: relative; min-height: 0; overflow: hidden; }
+#editor-host, .CodeMirror {
+  height: 100% !important;
+  font-family: var(--font-mono) !important;
+  font-size: 13.5px !important;
+  line-height: 1.55 !important;
+}
+.CodeMirror {
+  background: var(--editor-bg) !important;
+  color: var(--text) !important;
+}
+.CodeMirror-gutters { background: var(--editor-bg) !important; border-right: 1px solid var(--border-soft) !important; }
+.CodeMirror-linenumber { color: var(--text-3) !important; }
+.CodeMirror-cursor { border-left-color: var(--accent) !important; border-left-width: 2px !important; }
+.CodeMirror-selected { background: var(--accent-soft) !important; }
+.CodeMirror-focused .CodeMirror-selected { background: rgba(59,130,246,.28) !important; }
+.CodeMirror-activeline-background { background: rgba(59,130,246,.06) !important; }
+.CodeMirror-matchingbracket {
+  color: var(--accent) !important;
+  background: var(--accent-soft) !important;
+  font-weight: bold;
+}
+.CodeMirror-nonmatchingbracket { color: var(--danger) !important; }
+.cm-s-default .cm-keyword  { color: #c792ea; }
+.cm-s-default .cm-def      { color: #82aaff; }
+.cm-s-default .cm-variable { color: var(--text); }
+.cm-s-default .cm-variable-2 { color: #f78c6c; }
+.cm-s-default .cm-property { color: #7fdbca; }
+.cm-s-default .cm-operator { color: #89ddff; }
+.cm-s-default .cm-number   { color: #f78c6c; }
+.cm-s-default .cm-string   { color: #c3e88d; }
+.cm-s-default .cm-string-2 { color: #c3e88d; }
+.cm-s-default .cm-comment  { color: var(--text-3); font-style: italic; }
+.cm-s-default .cm-builtin  { color: #ffcb6b; }
+.cm-s-default .cm-meta     { color: #ffcb6b; }
+.cm-s-default .cm-atom     { color: #f78c6c; }
+.cm-s-default .cm-tag      { color: #f07178; }
+.cm-s-default .cm-attribute{ color: #ffcb6b; }
+html[data-theme="light"] .cm-s-default .cm-keyword { color: #7c3aed; }
+html[data-theme="light"] .cm-s-default .cm-def     { color: #2563eb; }
+html[data-theme="light"] .cm-s-default .cm-string  { color: #059669; }
+html[data-theme="light"] .cm-s-default .cm-number  { color: #d97706; }
+html[data-theme="light"] .cm-s-default .cm-comment { color: #94a3b8; }
+html[data-theme="light"] .cm-s-default .cm-builtin { color: #b45309; }
+
+/* TERMINAL PANEL */
+.term-panel {
+  display: flex;
+  flex-direction: column;
+  background: var(--term-bg);
+  border-top: 1px solid var(--border);
+  height: 280px;
+  min-height: 90px;
+  max-height: 70vh;
+}
+.term-resizer {
+  height: 5px;
+  cursor: ns-resize;
+  background: transparent;
+  margin-top: -5px;
+  position: relative;
+  z-index: 5;
+}
+.term-resizer:hover { background: var(--accent-soft); }
+.term-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 12px;
+  height: 32px;
+  background: var(--bg-1);
+  border-bottom: 1px solid var(--border);
+  font-size: 11.5px;
+  color: var(--text-3);
+  text-transform: uppercase;
+  font-weight: 700;
+  letter-spacing: .06em;
+  flex-shrink: 0;
+}
+.term-header .term-tabs { display: flex; gap: 2px; text-transform: none; letter-spacing: 0; }
+.term-tab {
+  padding: 4px 10px;
+  border-radius: 5px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-3);
+  cursor: pointer;
+  transition: background .1s, color .1s;
+}
+.term-tab:hover { background: var(--bg-hover); color: var(--text); }
+.term-tab.active { background: var(--bg-active); color: var(--text); }
+.term-header .spacer { flex: 1; }
+.term-actions { display: flex; gap: 2px; }
+.term-actions .icon-btn { width: 24px; height: 24px; color: var(--text-3); }
+.term-actions .icon-btn:hover { background: var(--bg-hover); color: var(--text); }
+
+.term-body { flex: 1; min-height: 0; position: relative; }
+#xterm { width: 100%; height: 100%; padding: 6px 4px; }
+
+/* Output pane (pestaña "Salida") */
+#outputPane {
+  position: absolute; inset: 0;
+  overflow-y: auto;
+  padding: 10px 14px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.55;
+  color: #d4d9e3;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+#outputPane .out-head { color: #60a5fa; font-weight: 700; margin: 10px 0 4px; }
+#outputPane .out-head:first-child { margin-top: 0; }
+#outputPane .out-line { color: #d4d9e3; }
+#outputPane .out-err  { color: #f87171; }
+#outputPane .out-sys  { color: #8b93a5; font-style: italic; }
+
+/* ============================================================
+   STATUS BAR
+   ============================================================ */
+.statusbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 0 14px;
+  background: var(--bg-1);
+  border-top: 1px solid var(--border);
+  font-size: 11.5px;
+  color: var(--text-2);
+}
+.status-item { display: flex; align-items: center; gap: 6px; }
+.status-item svg { width: 12px; height: 12px; }
+.status-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--danger); flex-shrink: 0;
+}
+.status-dot.online { background: var(--success); box-shadow: 0 0 6px var(--success); }
+.status-dot.busy   { background: var(--warn); animation: pulse 1s infinite; }
+@keyframes pulse { 50% { opacity: .4; } }
+.statusbar .spacer { flex: 1; }
+.statusbar .cursor-pos { font-family: var(--font-mono); font-size: 11px; color: var(--text-3); }
+
+/* ============================================================
+   TOASTS
+   ============================================================ */
+#toasts {
+  position: fixed;
+  bottom: 40px;
+  right: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 1000;
+  pointer-events: none;
+}
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 14px;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+  font-size: 13px;
+  color: var(--text);
+  min-width: 260px;
+  max-width: 380px;
+  pointer-events: auto;
+  animation: toast-in .25s cubic-bezier(.2,.9,.4,1);
+}
+@keyframes toast-in { from { opacity: 0; transform: translateX(20px); } }
+.toast.leaving { animation: toast-out .2s forwards; }
+@keyframes toast-out { to { opacity: 0; transform: translateX(20px); } }
+.toast svg { width: 16px; height: 16px; flex-shrink: 0; }
+.toast.success { border-left-color: var(--success); }
+.toast.success svg { color: var(--success); }
+.toast.error   { border-left-color: var(--danger); }
+.toast.error svg { color: var(--danger); }
+.toast.warn    { border-left-color: var(--warn); }
+.toast.warn svg { color: var(--warn); }
+.toast.info    svg { color: var(--accent); }
+
+/* ============================================================
+   MODALS / OVERLAYS
+   ============================================================ */
+.overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.5);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 500;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 12vh;
+  animation: fade-in .15s ease;
+}
+@keyframes fade-in { from { opacity: 0; } }
+.overlay.hidden { display: none; }
+
+.modal {
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  width: min(560px, 92vw);
+  max-height: 78vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: modal-in .2s cubic-bezier(.2,.9,.4,1);
+}
+@keyframes modal-in { from { opacity: 0; transform: translateY(-8px) scale(.98); } }
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+  font-weight: 600;
+  font-size: 14px;
+}
+.modal-header .title { display: flex; align-items: center; gap: 8px; }
+.modal-header .title svg { width: 16px; height: 16px; color: var(--accent); }
+.modal-body { padding: 16px 18px; overflow-y: auto; }
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 18px;
+  border-top: 1px solid var(--border);
+  background: var(--bg-2);
+}
+
+/* Form */
+.field { margin-bottom: 14px; }
+.field label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-2);
+  margin-bottom: 6px;
+}
+.field input[type=text], .field input[type=number], .field select {
+  width: 100%;
+  padding: 9px 12px;
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-size: 13.5px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color .12s, box-shadow .12s;
+}
+.field input:focus, .field select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.field .hint { font-size: 11.5px; color: var(--text-3); margin-top: 4px; }
+
+/* Command palette */
+.cmd-list { max-height: 50vh; overflow-y: auto; padding: 6px; }
+.cmd-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 13.5px;
+  cursor: pointer;
+  color: var(--text);
+}
+.cmd-item svg { width: 15px; height: 15px; color: var(--text-3); flex-shrink: 0; }
+.cmd-item:hover, .cmd-item.selected { background: var(--accent-soft); }
+.cmd-item:hover svg, .cmd-item.selected svg { color: var(--accent); }
+.cmd-item .cmd-key {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-3);
+}
+
+/* Shortcuts table */
+.shortcut-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  font-size: 13px;
+  border-bottom: 1px solid var(--border-soft);
+}
+.shortcut-row:last-child { border-bottom: 0; }
+.shortcut-row .label { color: var(--text-2); }
+.shortcut-group-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--text-3);
+  margin: 18px 0 6px;
+}
+.shortcut-group-title:first-child { margin-top: 0; }
+
+/* Settings section */
+.settings-section { margin-bottom: 22px; }
+.settings-section:last-child { margin-bottom: 0; }
+.settings-title {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--text-3);
+  margin-bottom: 12px;
+}
+
+/* Context menu */
+.ctx-menu {
+  position: fixed;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+  padding: 4px;
+  min-width: 190px;
+  z-index: 600;
+  font-size: 13px;
+}
+.ctx-menu.hidden { display: none; }
+.ctx-menu .ctx-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 10px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  color: var(--text);
+}
+.ctx-menu .ctx-item:hover { background: var(--accent-soft); }
+.ctx-menu .ctx-item.danger { color: var(--danger); }
+.ctx-menu .ctx-item.danger:hover { background: rgba(239,68,68,.12); }
+.ctx-menu .ctx-item svg { width: 14px; height: 14px; color: var(--text-3); }
+.ctx-menu .ctx-item.danger svg { color: var(--danger); }
+.ctx-menu .separator { height: 1px; background: var(--border); margin: 4px; }
+
+/* Scrollbars */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--scroll-thumb);
+  border-radius: 5px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover { background: var(--text-3); background-clip: content-box; border: 2px solid transparent; }
+
+/* Utilities */
+.hidden { display: none !important; }
+
+/* Responsive */
+@media (max-width: 900px) {
+  :root { --sidebar-w: 200px; }
+  .term-panel { height: 220px; }
+}
+@media (max-width: 640px) {
+  .workspace { grid-template-columns: 1fr; }
+  .sidebar { display: none; }
+  .topbar-actions .btn span { display: none; }
+  .topbar-actions .btn { padding: 0; width: 34px; justify-content: center; }
+}
+</style>
+</head>
+
+<body>
+<div class="app">
+
+  <!-- ======================= HEADER ======================= -->
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-logo"><i data-lucide="cpu"></i></div>
+      EspWebStudio<small>IDE</small>
+    </div>
+
+    <div class="topbar-actions">
+      <button class="btn primary" id="btnConnect" title="Conectar placa (Ctrl+K)">
+        <i data-lucide="plug"></i><span>Conectar</span>
+      </button>
+      <button class="btn" id="btnRun" disabled title="Ejecutar en RAM (F5)">
+        <i data-lucide="play"></i><span>Ejecutar</span>
+      </button>
+      <button class="btn" id="btnSave" disabled title="Guardar en la placa (Ctrl+S)">
+        <i data-lucide="save"></i><span>Guardar</span>
+      </button>
+      <button class="btn" id="btnSaveAs" disabled title="Guardar como… (Ctrl+Shift+S)">
+        <i data-lucide="save-all"></i>
+      </button>
+      <button class="btn" id="btnInterrupt" disabled title="Interrumpir ejecución (Ctrl+C)">
+        <i data-lucide="square"></i><span>Detener</span>
+      </button>
+      <button class="btn" id="btnReset" disabled title="Reiniciar placa (Ctrl+R)">
+        <i data-lucide="rotate-ccw"></i><span>Reset</span>
+      </button>
+    </div>
+
+    <div class="topbar-spacer"></div>
+
+    <div class="topbar-actions">
+      <button class="btn icon-only ghost" id="btnCommand" title="Paleta de comandos (Ctrl+Shift+P)">
+        <i data-lucide="command"></i>
+      </button>
+      <button class="btn icon-only ghost" id="btnTheme" title="Cambiar tema">
+        <i data-lucide="moon"></i>
+      </button>
+      <button class="btn icon-only ghost" id="btnSettings" title="Ajustes">
+        <i data-lucide="settings"></i>
+      </button>
+    </div>
+  </header>
+
+  <!-- ======================= WORKSPACE ======================= -->
+  <div class="workspace">
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+      <div class="sidebar-section">
+        <span>Explorador</span>
+        <div class="toolbar">
+          <button class="icon-btn" id="btnNewFile" title="Nuevo archivo">
+            <i data-lucide="file-plus"></i>
+          </button>
+          <button class="icon-btn" id="btnUpload" title="Subir archivo del PC">
+            <i data-lucide="upload"></i>
+          </button>
+          <button class="icon-btn" id="btnRefresh" title="Actualizar">
+            <i data-lucide="refresh-cw"></i>
+          </button>
+        </div>
+      </div>
+      <div class="file-list" id="fileList"></div>
+      <div class="sidebar-footer">
+        <i data-lucide="hard-drive"></i>
+        <span id="fsInfo">Sin conexión</span>
+      </div>
+    </aside>
+
+    <!-- MAIN AREA -->
+    <main class="main-area">
+
+      <!-- TABS -->
+      <div class="tabs-bar" id="tabsBar"></div>
+
+      <!-- EDITOR -->
+      <div class="editor-wrap">
+        <textarea id="editor-host"></textarea>
+      </div>
+
+      <!-- TERMINAL -->
+      <div class="term-resizer" id="termResizer"></div>
+      <div class="term-panel" id="termPanel">
+        <div class="term-header">
+          <div class="term-tabs">
+            <div class="term-tab active" data-tab="repl">REPL</div>
+            <div class="term-tab" data-tab="output">Salida</div>
+          </div>
+          <div class="spacer"></div>
+          <div class="term-actions">
+            <button class="icon-btn" id="btnTermClear" title="Limpiar terminal">
+              <i data-lucide="trash-2"></i>
+            </button>
+            <button class="icon-btn" id="btnTermCollapse" title="Colapsar terminal">
+              <i data-lucide="chevron-down"></i>
+            </button>
+          </div>
+        </div>
+        <div class="term-body">
+          <div id="xterm"></div>
+          <div id="outputPane" class="hidden"></div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- ======================= STATUS BAR ======================= -->
+  <footer class="statusbar">
+    <div class="status-item">
+      <span class="status-dot" id="statusDot"></span>
+      <span id="statusText">Desconectado</span>
+    </div>
+    <div class="status-item">
+      <i data-lucide="microchip"></i>
+      <span id="chipText">ESP32</span>
+    </div>
+    <div class="status-item">
+      <i data-lucide="usb"></i>
+      <span id="baudText">115200 baud</span>
+    </div>
+    <div class="spacer"></div>
+    <div class="status-item cursor-pos" id="cursorPos">Ln 1, Col 1</div>
+    <div class="status-item">
+      <span id="editorMode">Python</span>
+    </div>
+    <div class="status-item">
+      <i data-lucide="info"></i>
+      <span id="versionText">v1.0</span>
+    </div>
+  </footer>
+</div>
+
+<!-- ======================= TOASTS ======================= -->
+<div id="toasts"></div>
+
+<!-- ======================= COMMAND PALETTE ======================= -->
+<div class="overlay hidden" id="cmdOverlay">
+  <div class="modal" style="width:min(620px,92vw)">
+    <div style="padding: 10px 14px; border-bottom: 1px solid var(--border);">
+      <input type="text" id="cmdInput" placeholder="Escribe un comando..."
+        style="width:100%; background:transparent; border:0; outline:0; color:var(--text); font-size:15px; padding:8px 4px; font-family:inherit;">
+    </div>
+    <div class="cmd-list" id="cmdList"></div>
+  </div>
+</div>
+
+<!-- ======================= SETTINGS ======================= -->
+<div class="overlay hidden" id="settingsOverlay">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="title"><i data-lucide="settings"></i> Ajustes</div>
+      <button class="icon-btn" data-close="settingsOverlay"><i data-lucide="x"></i></button>
+    </div>
+    <div class="modal-body">
+      <div class="settings-section">
+        <div class="settings-title">Apariencia</div>
+        <div class="field">
+          <label>Tema</label>
+          <select id="setTheme">
+            <option value="dark">Oscuro</option>
+            <option value="light">Claro</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Tamaño de fuente del editor</label>
+          <input type="number" id="setFontSize" min="10" max="24" step="1">
+        </div>
+        <div class="field">
+          <label>Tamaño de pestaña</label>
+          <input type="number" id="setTabSize" min="2" max="8" step="1">
+        </div>
+      </div>
+      <div class="settings-section">
+        <div class="settings-title">Conexión</div>
+        <div class="field">
+          <label>Velocidad (baudios)</label>
+          <select id="setBaud">
+            <option value="115200">115200</option>
+            <option value="230400">230400</option>
+            <option value="460800">460800</option>
+            <option value="921600">921600</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>
+            <input type="checkbox" id="setAutoReconnect"> Reconectar automáticamente al recargar
+          </label>
+          <div class="hint">Usa la API Web Serial para reconectar con el último dispositivo autorizado.</div>
+        </div>
+      </div>
+      <div class="settings-section">
+        <div class="settings-title">Editor</div>
+        <div class="field">
+          <label><input type="checkbox" id="setAutocomplete"> Autocompletado</label>
+        </div>
+        <div class="field">
+          <label><input type="checkbox" id="setLineNumbers"> Mostrar números de línea</label>
+        </div>
+        <div class="field">
+          <label><input type="checkbox" id="setWordWrap"> Ajuste de línea</label>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" data-close="settingsOverlay">Cancelar</button>
+      <button class="btn primary" id="btnSaveSettings">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ======================= SHORTCUTS ======================= -->
+<div class="overlay hidden" id="shortcutsOverlay">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="title"><i data-lucide="keyboard"></i> Atajos de teclado</div>
+      <button class="icon-btn" data-close="shortcutsOverlay"><i data-lucide="x"></i></button>
+    </div>
+    <div class="modal-body" id="shortcutsBody"></div>
+    <div class="modal-footer">
+      <button class="btn primary" data-close="shortcutsOverlay">Entendido</button>
+    </div>
+  </div>
+</div>
+
+<!-- ======================= RENAME ======================= -->
+<div class="overlay hidden" id="renameOverlay">
+  <div class="modal" style="width:min(420px,92vw)">
+    <div class="modal-header">
+      <div class="title"><i data-lucide="pen-line"></i> Renombrar archivo</div>
+    </div>
+    <div class="modal-body">
+      <div class="field">
+        <label>Nuevo nombre</label>
+        <input type="text" id="renameInput" placeholder="ejemplo.py" spellcheck="false">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" data-close="renameOverlay">Cancelar</button>
+      <button class="btn primary" id="renameConfirm">Renombrar</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ======================= DOCUMENTACIÓN (README + LICENCIA) ======================= -->
+<div class="overlay hidden" id="docsOverlay">
+  <div class="modal" style="width:min(720px,94vw)">
+    <div class="modal-header">
+      <div class="title"><i data-lucide="book-open"></i> Documentación</div>
+      <button class="icon-btn" data-close="docsOverlay"><i data-lucide="x"></i></button>
+    </div>
+    <div class="modal-body" style="padding:0;">
+      <div class="term-tabs" style="display:flex; gap:2px; padding:10px 14px 0; border-bottom:1px solid var(--border);">
+        <div class="term-tab active" data-doc="readme">README</div>
+        <div class="term-tab" data-doc="license">Licencia MIT</div>
+        <div class="term-tab" data-doc="about">Acerca de</div>
+      </div>
+      <div id="docPane" style="padding:16px 18px; max-height:56vh; overflow-y:auto; font-size:13px; line-height:1.65;"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn primary" data-close="docsOverlay">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ======================= CONTEXT MENU ======================= -->
+<div class="ctx-menu hidden" id="ctxMenu"></div>
+
+<!-- ======================= FILE INPUT (hidden) ======================= -->
+<input type="file" id="fileInput" class="hidden" accept=".py,.txt,.json,.csv,.html,.css,.js,.md,.xml">
+
+<script>
+/* ============================================================================
+   EspWebStudio v1.0.0 — IDE MicroPython para ESP32
+   ---------------------------------------------------------------------------
+   100% cliente. Sin backend. Web Serial API + CodeMirror 5 + xterm.js.
+   Licencia: MIT
+   ============================================================================ */
+(() => {
+"use strict";
+
+/* ============================================================================
+   1. UTILIDADES GENERALES
+   ============================================================================ */
+const $  = (sel, ctx=document) => ctx.querySelector(sel);
+const $$ = (sel, ctx=document) => [...ctx.querySelectorAll(sel)];
+const enc = new TextEncoder();
+const dec = new TextDecoder();
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+const escapeHtml = (s) => String(s).replace(/[&<>"']/g, c =>
+  ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+
+function refreshIcons() { if (window.lucide) lucide.createIcons(); }
+
+/* ---------- Toasts ---------- */
+const ICONS_TOAST = { success:'check-circle-2', error:'alert-circle', warn:'alert-triangle', info:'info' };
+function toast(message, kind='info', timeout=3200) {
+  const el = document.createElement('div');
+  el.className = `toast ${kind}`;
+  el.innerHTML = `<i data-lucide="${ICONS_TOAST[kind] || 'info'}"></i><div style="flex:1;">${escapeHtml(message)}</div>`;
+  $('#toasts').appendChild(el);
+  refreshIcons();
+  setTimeout(() => {
+    el.classList.add('leaving');
+    setTimeout(() => el.remove(), 200);
+  }, timeout);
+}
+
+/* ---------- Modal helpers ---------- */
+function openOverlay(id)  { $('#'+id).classList.remove('hidden'); }
+function closeOverlay(id) { $('#'+id).classList.add('hidden'); }
+$$('[data-close]').forEach(b => b.addEventListener('click', () => closeOverlay(b.dataset.close)));
+$$('.overlay').forEach(ov => ov.addEventListener('click', e => {
+  if (e.target === ov) ov.classList.add('hidden');
+}));
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') $$('.overlay').forEach(o => o.classList.add('hidden'));
+});
+
+/* ============================================================================
+   2. CONFIGURACIÓN PERSISTENTE
+   ============================================================================ */
+const DEFAULT_SETTINGS = {
+  theme: 'dark',
+  fontSize: 13.5,
+  tabSize: 4,
+  baud: 115200,
+  autocomplete: true,
+  lineNumbers: true,
+  wordWrap: false,
+  autoReconnect: true,
+};
+const SETTINGS_KEY = 'espwebstudio.settings';
+
+function loadSettings() {
+  try { return { ...DEFAULT_SETTINGS, ...JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}') }; }
+  catch { return { ...DEFAULT_SETTINGS }; }
+}
+function saveSettings(s) { localStorage.setItem(SETTINGS_KEY, JSON.stringify(s)); }
+
+let settings = loadSettings();
+
+function applyTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  settings.theme = theme;
+  saveSettings(settings);
+  const icon = theme === 'dark' ? 'moon' : 'sun';
+  $('#btnTheme').innerHTML = `<i data-lucide="${icon}"></i>`;
+  refreshIcons();
+}
+applyTheme(settings.theme);
+
+/* ============================================================================
+   3. SERIAL MANAGER
+   ============================================================================ */
+class SerialManager {
+  constructor() {
+    this.port = null;
+    this.writer = null;
+    this.reader = null;
+    this.connected = false;
+    this.mode = 'idle';           // 'idle' | 'terminal' | 'raw'
+    this.rawBuffer = '';
+    this.rawResolver = null;
+    this.rawRejecter = null;
+    this.rawTimer = null;
+    this.listeners = { data: [], state: [] };
+  }
+  on(evt, fn) { (this.listeners[evt] ||= []).push(fn); return this; }
+  emit(evt, payload) { (this.listeners[evt] || []).forEach(f => f(payload)); }
+
+  async connect() {
+    if (this.connected) return;
+    this.port = await navigator.serial.requestPort();
+    await this._openPort();
+  }
+  async reconnect(port) {
+    this.port = port;
+    await this._openPort();
+  }
+  async _openPort() {
+    await this.port.open({ baudRate: settings.baud });
+    this.writer = this.port.writable.getWriter();
+    this.reader = this.port.readable.getReader();
+    this.connected = true;
+    this.mode = 'terminal';
+    this.emit('state', { connected: true });
+    this._readLoop();
+  }
+  async disconnect() {
+    if (!this.connected) return;
+    this.connected = false;
+    try { this._rejectRaw(new Error('Desconectado')); } catch {}
+    try { await this.writer.write(enc.encode('\x02')); } catch {}
+    try { await this.reader?.cancel(); } catch {}
+    try { await this.reader?.releaseLock(); } catch {}
+    try { await this.writer?.releaseLock(); } catch {}
+    try { await this.port?.close(); } catch {}
+    this.writer = this.reader = this.port = null;
+    this.mode = 'idle';
+    this.emit('state', { connected: false });
+  }
+
+  async write(str) {
+    if (!this.writer) return;
+    await this.writer.write(enc.encode(str));
+  }
+
+  async _readLoop() {
+    try {
+      while (this.connected) {
+        const { value, done } = await this.reader.read();
+        if (done) break;
+        if (value) this._handleData(dec.decode(value, { stream: true }));
+      }
+    } catch { /* puerto desconectado físicamente */ }
+    if (this.connected) {
+      this.connected = false;
+      this.mode = 'idle';
+      this.emit('state', { connected: false, unexpected: true });
+    }
+  }
+
+  _handleData(text) {
+    if (this.mode === 'raw') {
+      this.rawBuffer += text;
+      const end = this.rawBuffer.indexOf('\x04>');
+      if (end !== -1) {
+        const payload = this.rawBuffer.slice(0, end);
+        this.rawBuffer = '';
+        const split = payload.indexOf('\x04');
+        const stdout = split >= 0 ? payload.slice(0, split) : payload;
+        const stderr = split >= 0 ? payload.slice(split + 1) : '';
+        clearTimeout(this.rawTimer);
+        this.rawTimer = null;
+        const resolve = this.rawResolver;
+        this.rawResolver = this.rawRejecter = null;
+        this.mode = 'terminal';
+        this.write('\x02');   // volver al REPL "friendly"
+        resolve?.({ stdout, stderr });
+      }
+    } else {
+      this.emit('data', text);
+    }
+  }
+
+  _rejectRaw(err) {
+    if (this.rawTimer) { clearTimeout(this.rawTimer); this.rawTimer = null; }
+    const reject = this.rawRejecter;
+    this.rawResolver = this.rawRejecter = null;
+    this.rawBuffer = '';
+    if (this.mode === 'raw') this.mode = 'terminal';
+    reject?.(err);
+  }
+
+  /* Aborta una ejecución en curso (Raw REPL) y devuelve el control al REPL. */
+  async abortRaw() {
+    if (this.mode !== 'raw') return;
+    this.write('\x02');       // Ctrl-B: salir de Raw REPL
+    await sleep(60);
+    this.write('\x03');       // Ctrl-C: interrumpir el programa
+    this._rejectRaw(new Error('Ejecución interrumpida por el usuario'));
+  }
+
+  async rawExec(code, timeoutMs = 8000) {
+    if (!this.connected) throw new Error('Sin conexión');
+    if (this.mode === 'raw') { await this.write('\x02'); await sleep(80); }
+
+    this.mode = 'raw';
+    this.rawBuffer = '';
+    await this.write('\x01');     // Ctrl-A → Raw REPL
+
+    const t0 = Date.now();
+    while (Date.now() - t0 < 1500) {
+      if (this.rawBuffer.includes('raw REPL') && this.rawBuffer.includes('>')) break;
+      await sleep(15);
+    }
+    this.rawBuffer = '';
+
+    return new Promise((resolve, reject) => {
+      this.rawResolver = resolve;
+      this.rawRejecter = reject;
+      this.rawTimer = setTimeout(() => {
+        this._rejectRaw(new Error('Tiempo de espera agotado (Raw REPL)'));
+      }, timeoutMs);
+      this.write(code + '\x04');  // código + Ctrl-D
+    });
+  }
+
+  async interrupt()  { if (this.connected) await this.write('\x03'); }
+  async softReset()  {
+    if (!this.connected) return;
+    await this.write('\x03'); await sleep(80);
+    await this.write('\x03'); await sleep(80);
+    await this.write('\x04'); await sleep(150);
+    await this.write('\x02');     // asegurar REPL friendly
+  }
+}
+
+const serial = new SerialManager();
+
+/* ============================================================================
+   4. TERMINAL (xterm.js)
+   ============================================================================ */
+const term = new Terminal({
+  cursorBlink: true,
+  fontSize: 13,
+  fontFamily: '"JetBrains Mono","Fira Code",Consolas,monospace',
+  theme: {
+    background: '#06080c', foreground: '#d4d9e3',
+    cursor: '#3b82f6', selectionBackground: 'rgba(59,130,246,.35)',
+    black:'#0b0d12', red:'#ef4444', green:'#10b981', yellow:'#f59e0b',
+    blue:'#3b82f6', magenta:'#a855f7', cyan:'#06b6d4', white:'#e6ebf2',
+    brightBlack:'#5c687a', brightRed:'#f87171', brightGreen:'#34d399',
+    brightYellow:'#fbbf24', brightBlue:'#60a5fa', brightMagenta:'#c084fc',
+    brightCyan:'#22d3ee', brightWhite:'#ffffff',
+  },
+  convertEol: true,
+  scrollback: 5000,
+});
+const fitAddon = new FitAddon.FitAddon();
+term.loadAddon(fitAddon);
+term.loadAddon(new WebLinksAddon.WebLinksAddon());
+term.open($('#xterm'));
+fitAddon.fit();
+
+serial.on('data', chunk => term.write(chunk));
+term.onData(data => {
+  if (serial.connected && serial.mode === 'terminal') serial.write(data);
+});
+window.addEventListener('resize', () => fitAddon.fit());
+
+term.writeln('\x1b[1;36m  EspWebStudio v1.0.0\x1b[0m');
+term.writeln('\x1b[90m  IDE MicroPython para placas ESP32 (C3, S3, clásico…)\x1b[0m');
+term.writeln('');
+term.writeln('\x1b[33m▸ Conecta tu placa por USB con Chrome o Edge (Web Serial API)\x1b[0m');
+term.writeln('');
+
+/* ---------- Panel de Salida ---------- */
+function logOutput(text, kind='line') {
+  const pane = $('#outputPane');
+  const div = document.createElement('div');
+  div.className = 'out-' + kind;
+  div.textContent = text;
+  pane.appendChild(div);
+  pane.scrollTop = pane.scrollHeight;
+}
+
+function switchTermTab(tab) {
+  $$('.term-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+  $('#xterm').classList.toggle('hidden', tab !== 'repl');
+  $('#outputPane').classList.toggle('hidden', tab !== 'output');
+  if (tab === 'repl') setTimeout(() => fitAddon.fit(), 30);
+  else term.blur();
+}
+$$('.term-tab').forEach(t => t.addEventListener('click', () => switchTermTab(t.dataset.tab)));
+
+/* ============================================================================
+   5. EDITOR (CodeMirror 5)
+   ============================================================================ */
+const cm = CodeMirror.fromTextArea($('#editor-host'), {
+  mode: 'python',
+  theme: 'default',
+  lineNumbers: settings.lineNumbers,
+  indentUnit: settings.tabSize,
+  tabSize: settings.tabSize,
+  indentWithTabs: false,
+  smartIndent: true,
+  electricChars: true,
+  matchBrackets: true,
+  autoCloseBrackets: true,
+  styleActiveLine: true,
+  lineWrapping: settings.wordWrap,
+  foldGutter: true,
+  gutters: ['CodeMirror-linenumbers','CodeMirror-foldgutter'],
+  extraKeys: {
+    'Ctrl-Space': 'autocomplete',
+    'Tab': (cm) => {
+      if (cm.somethingSelected()) cm.indentSelection('add');
+      else cm.replaceSelection(' '.repeat(settings.tabSize));
+    },
+    'Shift-Tab': (cm) => cm.indentSelection('subtract'),
+    'Ctrl-/': 'toggleComment',
+    'Cmd-/':  'toggleComment',
+  },
+});
+cm.setSize('100%', '100%');
+
+function applyEditorFont() {
+  let styleEl = document.getElementById('cm-dynamic-style');
+  if (!styleEl) {
+    styleEl = document.createElement('style');
+    styleEl.id = 'cm-dynamic-style';
+    document.head.appendChild(styleEl);
+  }
+  styleEl.textContent = `.CodeMirror { font-size: ${settings.fontSize}px !important; }`;
+}
+applyEditorFont();
+
+cm.on('cursorActivity', () => {
+  const c = cm.getCursor();
+  $('#cursorPos').textContent = `Ln ${c.line + 1}, Col ${c.ch + 1}`;
+});
+
+/* ============================================================================
+   6. AUTOCOMPLETADO MicroPython
+   ============================================================================ */
+const MP_KEYWORDS = [
+  'False','None','True','and','as','assert','async','await','break','class','continue',
+  'def','del','elif','else','except','finally','for','from','global','if','import','in',
+  'is','lambda','nonlocal','not','or','pass','raise','return','try','while','with','yield',
+];
+const MP_BUILTINS = [
+  'abs','all','any','bin','bool','bytes','bytearray','callable','chr','classmethod',
+  'dict','dir','divmod','enumerate','filter','float','format','frozenset','getattr','globals',
+  'hasattr','hash','hex','id','input','int','isinstance','issubclass','iter','len','list','locals',
+  'map','max','memoryview','min','next','object','oct','open','ord','pow','print','property','range',
+  'repr','reversed','round','set','setattr','slice','sorted','staticmethod','str','sum','super',
+  'tuple','type','zip','const','micropython',
+];
+const MP_MODULES = [
+  'machine','time','utime','os','sys','gc','micropython','network','socket','ujson','json',
+  'ubinascii','binascii','ustruct','struct','ure','re','uselect','select','math','cmath',
+  'random','_thread','array','collections','errno','heapq','io','uio','hashlib',
+  'framebuf','neopixel','bluetooth','esp','esp32','dht','onewire','ds18x20','uasyncio','asyncio',
+];
+const MP_API = [
+  'Pin','ADC','PWM','I2C','SoftI2C','SPI','SoftSPI','UART','Timer','WDT','RTC','Signal',
+  'DEEPSLEEP','SLEEP','LIGHTSLEEP','reset','reset_cause','freq','idle','sleep_ms','sleep_us',
+  'PWRON_RESET','HARD_RESET','WDT_RESET','DEEPSLEEP_RESET','SOFT_RESET',
+  'IN','OUT','OPEN_DRAIN','PULL_UP','PULL_DOWN','IRQ_RISING','IRQ_FALLING','value','on','off',
+  'init','irq','toggle','scan','readfrom','writeto','readfrom_mem','writeto_mem',
+  'read','readinto','write','write_readinto','any','readline','readlines',
+  'WLAN','STA_IF','AP_IF','active','isconnected','ifconfig','config','connect','disconnect',
+  'status','scan','listdir','mkdir','rmdir','remove','rename','stat','statvfs','uname',
+  'collect','enable','disable','mem_free','mem_alloc','threshold','isenabled',
+  'ticks_ms','ticks_us','ticks_cpu','ticks_add','ticks_diff','time','localtime','mktime',
+  'WIFI_PS_NONE','WIFI_PS_MIN_MODEM','WIFI_PS_MAX_MODEM',
+  'NeoPixel','fill','flash_size','flash_id',
+];
+
+function microPythonHint(editor) {
+  const cur = editor.getCursor();
+  const token = editor.getTokenAt(cur);
+  const word = (token.string || '').replace(/^[^A-Za-z0-9_]+/, '');
+  const start = token.start + (token.string.length - word.length);
+  const list = new Set([...MP_KEYWORDS, ...MP_BUILTINS, ...MP_MODULES, ...MP_API]);
+  const localWords = (editor.getValue().match(/[A-Za-z_][A-Za-z0-9_]{2,}/g) || []);
+  localWords.forEach(w => list.add(w));
+  const result = [...list]
+    .filter(w => w.toLowerCase().startsWith(word.toLowerCase()) && w !== word)
+    .sort()
+    .slice(0, 40)
+    .map(w => ({ text: w, displayText: w }));
+  return { list: result, from: CodeMirror.Pos(cur.line, start), to: CodeMirror.Pos(cur.line, cur.ch) };
+}
+CodeMirror.registerHelper('hint', 'python', microPythonHint);
+CodeMirror.commands.autocomplete = CodeMirror.showHint;
+
+cm.on('inputRead', (cm, change) => {
+  if (!settings.autocomplete) return;
+  if (change.text[0] && change.text[0].match(/[A-Za-z_]/)) {
+    cm.showHint({ hint: microPythonHint, completeSingle: false });
+  }
+});
+
+/* ============================================================================
+   7. GESTIÓN DE ARCHIVOS (Buffers / Pestañas)
+   ============================================================================ */
+const state = {
+  docs: [],
+  activeId: null,
+  deviceFiles: [],
+  running: false,
+};
+
+function newDoc(name=null, content='', isLocal=true) {
+  const doc = {
+    id: 'doc_' + Math.random().toString(36).slice(2, 10),
+    name, content, dirty: false, isLocal,
+  };
+  state.docs.push(doc);
+  activateDoc(doc.id);
+  renderTabs();
+  return doc;
+}
+
+function activeDoc() { return state.docs.find(d => d.id === state.activeId) || null; }
+
+function activateDoc(id) {
+  const doc = state.docs.find(d => d.id === id);
+  if (!doc) return;
+  const prev = activeDoc();
+  if (prev && prev.id !== id) prev.content = cm.getValue();
+
+  state.activeId = id;
+  cm.setValue(doc.content || '');
+  cm.clearHistory();
+  cm.setCursor(0, 0);
+  doc.dirty = false;
+  renderTabs();
+  updateEditorMode();
+  if (!doc.isLocal && doc.name) highlightActiveFile(doc.name);
+}
+
+function closeDoc(id) {
+  const idx = state.docs.findIndex(d => d.id === id);
+  if (idx === -1) return;
+  const doc = state.docs[idx];
+  if (doc.dirty) {
+    if (!confirm(`"${doc.name || 'Sin título'}" tiene cambios sin guardar. ¿Cerrar de todas formas?`)) return;
+  }
+  state.docs.splice(idx, 1);
+  if (state.activeId === id) {
+    const next = state.docs[idx] || state.docs[idx - 1];
+    if (next) activateDoc(next.id);
+    else { state.activeId = null; newDoc(); }
+  }
+  renderTabs();
+}
+
+function renderTabs() {
+  const bar = $('#tabsBar');
+  bar.innerHTML = '';
+  state.docs.forEach(doc => {
+    const tab = document.createElement('div');
+    tab.className = 'tab' + (doc.id === state.activeId ? ' active' : '') + (doc.dirty ? ' dirty' : '');
+    tab.title = doc.isLocal ? `${doc.name || 'Sin título'} (local)` : `${doc.name} (en la placa)`;
+    tab.innerHTML = `
+      <span class="tab-dot"></span>
+      <span class="tab-name">${escapeHtml(doc.name || 'Sin título')}</span>
+      <span class="tab-close"><i data-lucide="x"></i></span>`;
+    tab.addEventListener('click', e => {
+      if (e.target.closest('.tab-close')) { closeDoc(doc.id); return; }
+      activateDoc(doc.id);
+    });
+    tab.addEventListener('auxclick', e => { if (e.button === 1) closeDoc(doc.id); });
+    bar.appendChild(tab);
+  });
+  refreshIcons();
+}
+
+cm.on('change', () => {
+  const doc = activeDoc();
+  if (!doc) return;
+  const val = cm.getValue();
+  if (!doc.dirty && val !== doc.content) {
+    doc.dirty = true;
+    renderTabs();
+  }
+});
+
+function updateEditorMode() {
+  const doc = activeDoc();
+  const name = ((doc && doc.name) || '').toLowerCase();
+  let mode = 'python';
+  if (name.endsWith('.json')) mode = 'javascript';
+  else if (name.endsWith('.md')) mode = 'markdown';
+  else if (name.endsWith('.html') || name.endsWith('.htm')) mode = 'htmlmixed';
+  else if (name.endsWith('.css')) mode = 'css';
+  else if (name.endsWith('.js')) mode = 'javascript';
+  else if (name.endsWith('.xml')) mode = 'xml';
+  if (!CodeMirror.modes[mode]) mode = 'python';
+  cm.setOption('mode', mode);
+  $('#editorMode').textContent = mode === 'htmlmixed' ? 'HTML' : mode[0].toUpperCase() + mode.slice(1);
+}
+
+/* ============================================================================
+   8. OPERACIONES EN EL DISPOSITIVO
+   ============================================================================ */
+const pyStr = (s) => String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+
+function formatKB(bytes) {
+  if (bytes >= 1048576) return (bytes / 1048576).toFixed(2) + ' MB';
+  return Math.round(bytes / 1024) + ' KB';
+}
+
+async function syncFilesystem(silent=false) {
+  if (!serial.connected) return;
+  try {
+    const code =
+      "import os, json\n" +
+      "try:\n" +
+      "    files = sorted(os.listdir())\n" +
+      "    print(json.dumps(files))\n" +
+      "except Exception:\n" +
+      "    print(json.dumps([]))\n" +
+      "try:\n" +
+      "    s = os.statvfs('/')\n" +
+      "    print('FS:%d:%d' % (s[0]*s[3], s[0]*s[2]))\n" +
+      "except Exception:\n" +
+      "    pass\n";
+    const { stdout } = await serial.rawExec(code, 4000);
+    const lines = stdout.trim().split('\n').filter(Boolean);
+    const jsonLine = lines.find(l => l.trim().startsWith('[')) || '[]';
+    const files = JSON.parse(jsonLine);
+    state.deviceFiles = files;
+    renderFileList(files);
+
+    const fsLine = lines.find(l => l.startsWith('FS:'));
+    if (fsLine) {
+      const [, free, total] = fsLine.split(':');
+      $('#fsInfo').textContent = `${files.length} arch · ${formatKB(+free)} libres de ${formatKB(+total)}`;
+    } else {
+      $('#fsInfo').textContent = `${files.length} archivo${files.length !== 1 ? 's' : ''}`;
+    }
+    if (!silent) toast(`Explorador actualizado: ${files.length} archivo(s)`, 'info', 2000);
+  } catch (e) {
+    if (!silent) toast('Error listando archivos: ' + e.message, 'error');
+  }
+}
+
+function sidebarDisconnected() {
+  $('#fileList').innerHTML = `
+    <div class="empty-state">
+      <i data-lucide="usb"></i>
+      <div>Conecta tu placa ESP32<br>para ver sus archivos.</div>
+    </div>`;
+  refreshIcons();
+  $('#fsInfo').textContent = 'Sin conexión';
+}
+
+function renderFileList(files) {
+  const list = $('#fileList');
+  list.innerHTML = '';
+  if (!files.length) {
+    list.innerHTML = `
+      <div class="empty-state">
+        <i data-lucide="folder-open"></i>
+        <div>Almacenamiento vacío.<br>Crea un nuevo archivo con «Nuevo».</div>
+      </div>`;
+    refreshIcons();
+    return;
+  }
+  files.forEach(name => {
+    const item = document.createElement('div');
+    item.className = 'file-item';
+    item.dataset.name = name;
+    item.innerHTML = `
+      <i data-lucide="file-code-2" class="file-icon"></i>
+      <span class="file-name">${escapeHtml(name)}</span>
+      <span class="file-more">
+        <button class="icon-btn" data-act="download" title="Descargar al PC"><i data-lucide="download"></i></button>
+        <button class="icon-btn" data-act="rename"   title="Renombrar"><i data-lucide="pen-line"></i></button>
+        <button class="icon-btn" data-act="delete"   title="Eliminar"><i data-lucide="trash-2"></i></button>
+      </span>`;
+    item.addEventListener('click', e => {
+      const act = e.target.closest('[data-act]')?.dataset.act;
+      if (act === 'delete')   { e.stopPropagation(); purgeFile(name); return; }
+      if (act === 'rename')   { e.stopPropagation(); promptRename(name); return; }
+      if (act === 'download') { e.stopPropagation(); downloadFile(name); return; }
+      openRemoteFile(name);
+    });
+    item.addEventListener('contextmenu', e => {
+      e.preventDefault();
+      showCtxMenu(e.clientX, e.clientY, name);
+    });
+    list.appendChild(item);
+  });
+  refreshIcons();
+}
+
+function highlightActiveFile(name) {
+  $$('.file-item').forEach(el => el.classList.toggle('active', el.dataset.name === name));
+}
+
+async function openRemoteFile(name) {
+  const existing = state.docs.find(d => !d.isLocal && d.name === name);
+  if (existing) { activateDoc(existing.id); return; }
+
+  setBusy(true);
+  try {
+    const code =
+      "import ubinascii\n" +
+      `f = open('${pyStr(name)}', 'rb')\n` +
+      "data = f.read()\n" +
+      "f.close()\n" +
+      "print(ubinascii.b2a_base64(data).decode())\n";
+    const { stdout, stderr } = await serial.rawExec(code, 8000);
+    if (stderr && stderr.trim()) throw new Error(stderr.trim());
+    const b64 = (stdout.trim().split('\n').pop() || '').trim();
+    const content = b64 ? base64ToText(b64) : '';
+    newDoc(name, content, false);
+  } catch (e) {
+    toast('Error abriendo archivo: ' + e.message, 'error');
+  } finally {
+    setBusy(false);
+  }
+}
+
+async function purgeFile(name) {
+  if (!confirm(`¿Eliminar definitivamente "${name}" de la placa?`)) return;
+  setBusy(true);
+  try {
+    await serial.rawExec(`import os\nos.remove('${pyStr(name)}')\n`, 4000);
+    const doc = state.docs.find(d => !d.isLocal && d.name === name);
+    if (doc) { doc.dirty = false; closeDoc(doc.id); }
+    await syncFilesystem(true);
+    toast(`"${name}" eliminado`, 'success');
+  } catch (e) {
+    toast('Error eliminando: ' + e.message, 'error');
+  } finally { setBusy(false); }
+}
+
+async function downloadFile(name) {
+  try {
+    const code =
+      "import ubinascii\n" +
+      `f = open('${pyStr(name)}', 'rb')\n` +
+      "data = f.read()\nf.close()\n" +
+      "print(ubinascii.b2a_base64(data).decode())\n";
+    const { stdout } = await serial.rawExec(code, 8000);
+    const b64 = (stdout.trim().split('\n').pop() || '').trim();
+    const blob = new Blob([base64ToBytes(b64)], { type: 'application/octet-stream' });
+    const url = URL.createObjectURL(blob);
+    const a = Object.assign(document.createElement('a'), { href: url, download: name });
+    a.click();
+    URL.revokeObjectURL(url);
+    toast(`Descargado: ${name}`, 'success');
+  } catch (e) {
+    toast('Error descargando: ' + e.message, 'error');
+  }
+}
+
+/* ---------- Renombrar (modal) ---------- */
+let renamingFile = null;
+function promptRename(name) {
+  renamingFile = name;
+  $('#renameInput').value = name;
+  openOverlay('renameOverlay');
+  setTimeout(() => { const inp = $('#renameInput'); inp.focus(); inp.select(); }, 50);
+}
+$('#renameConfirm').addEventListener('click', async () => {
+  const newName = $('#renameInput').value.trim();
+  if (!newName || newName === renamingFile) { closeOverlay('renameOverlay'); return; }
+  if (!/^[\w.\-]+$/.test(newName)) { toast('Nombre inválido (usa letras, números, _ - .)', 'error'); return; }
+  closeOverlay('renameOverlay');
+  setBusy(true);
+  try {
+    await serial.rawExec(`import os\nos.rename('${pyStr(renamingFile)}', '${pyStr(newName)}')\n`, 4000);
+    const doc = state.docs.find(d => !d.isLocal && d.name === renamingFile);
+    if (doc) { doc.name = newName; doc.dirty = false; renderTabs(); updateEditorMode(); }
+    await syncFilesystem(true);
+    toast(`Renombrado a "${newName}"`, 'success');
+  } catch (e) {
+    toast('Error renombrando: ' + e.message, 'error');
+  } finally { setBusy(false); }
+});
+$('#renameInput').addEventListener('keydown', e => { if (e.key === 'Enter') $('#renameConfirm').click(); });
+
+/* ---------- Guardar en la placa ---------- */
+async function saveActiveToDevice() {
+  const doc = activeDoc();
+  if (!doc) return;
+  if (!doc.name) { toast('Este documento no tiene nombre. Usa «Guardar como» (Ctrl+Shift+S).', 'warn'); return; }
+  if (!serial.connected) { toast('Conecta la placa primero', 'warn'); return; }
+
+  doc.content = cm.getValue();
+  setBusy(true, `Guardando ${doc.name}…`);
+  try {
+    const b64 = bytesToBase64(enc.encode(doc.content));
+    const CHUNK = 400;
+    let py = "import ubinascii\nb64 = ''\n";
+    for (let i = 0; i < b64.length; i += CHUNK) py += `b64 += '${b64.slice(i, i + CHUNK)}'\n`;
+    py += "try:\n";
+    py += "    data = ubinascii.a2b_base64(b64)\n";
+    py += `    f = open('${pyStr(doc.name)}', 'wb')\n`;
+    py += "    f.write(data)\n    f.close()\n    print('OK')\n";
+    py += "except Exception as e:\n    print('ERR:' + str(e))\n";
+
+    const { stdout, stderr } = await serial.rawExec(py, 30000);
+    if (stdout.includes('ERR:') || (stderr && stderr.trim()) || !stdout.includes('OK')) {
+      throw new Error((stdout.match(/ERR:(.*)/)?.[1] || stderr || 'Error desconocido').trim());
+    }
+    doc.dirty = false;
+    doc.isLocal = false;
+    renderTabs();
+    updateEditorMode();
+    toast(`"${doc.name}" guardado en la placa`, 'success');
+    await syncFilesystem(true);
+    if (!doc.isLocal && doc.name) highlightActiveFile(doc.name);
+  } catch (e) {
+    toast('Error guardando: ' + e.message, 'error', 5000);
+  } finally {
+    setBusy(false);
+  }
+}
+
+async function saveActiveAs() {
+  const doc = activeDoc();
+  if (!doc) return;
+  const name = prompt('Nombre del archivo en la placa (ej. main.py):', doc.name || 'main.py');
+  if (!name) return;
+  if (!/^[\w.\-]+$/.test(name)) { toast('Nombre inválido', 'error'); return; }
+  doc.name = name;
+  doc.isLocal = false;
+  renderTabs();
+  updateEditorMode();
+  await saveActiveToDevice();
+}
+
+/* ---------- Nuevo archivo local ---------- */
+function newFile() {
+  const name = prompt('Nombre del archivo:', 'nuevo.py');
+  if (!name) return;
+  if (!/^[\w.\-]+$/.test(name)) { toast('Nombre inválido', 'error'); return; }
+  newDoc(name, '', true);
+  toast(`"${name}" creado (local — guárdalo en la placa con Ctrl+S)`, 'info');
+}
+
+/* ---------- Subir archivo desde el PC ---------- */
+function triggerUpload() { $('#fileInput').click(); }
+$('#fileInput').addEventListener('change', async e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  try {
+    const text = await file.text();
+    newDoc(file.name, text, true);
+    toast(`"${file.name}" cargado — guárdalo en la placa con Ctrl+S`, 'info');
+  } catch { toast('No se pudo leer el archivo', 'error'); }
+  e.target.value = '';
+});
+
+/* ---------- Exportar pestaña activa al PC ---------- */
+function exportActiveDoc() {
+  const doc = activeDoc();
+  if (!doc) return;
+  doc.content = cm.getValue();
+  const name = doc.name || 'sin_titulo.py';
+  const blob = new Blob([doc.content], { type: 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = Object.assign(document.createElement('a'), { href: url, download: name });
+  a.click();
+  URL.revokeObjectURL(url);
+  toast(`Exportado: ${name}`, 'success');
+}
+
+/* ---------- Ejecutar en RAM (Raw REPL, salida capturada) ---------- */
+async function runInRam() {
+  if (!serial.connected) { toast('Conecta la placa primero', 'warn'); return; }
+  if (state.running) { toast('Ya hay una ejecución en curso', 'warn'); return; }
+  const doc = activeDoc();
+  let code = cm.getValue();
+  if (!code.trim()) { toast('El editor está vacío', 'warn'); return; }
+  if (!code.endsWith('\n')) code += '\n';
+
+  state.running = true;
+  setBusy(true, 'Ejecutando…');
+  updateStatusBar();
+  switchTermTab('output');
+  logOutput(`▸ ${doc?.name || 'Sin título'} — ${new Date().toLocaleTimeString()}`, 'head');
+
+  try {
+    await serial.write('\x03');           // interrumpir ejecución previa
+    await sleep(150);
+    const { stdout, stderr } = await serial.rawExec(code, 120000);
+    if (stdout) logOutput(stdout.replace(/\n$/, ''), 'line');
+    if (stderr && stderr.trim()) logOutput(stderr.trim(), 'err');
+    if (!stdout && !(stderr && stderr.trim())) logOutput('(sin salida)', 'sys');
+  } catch (e) {
+    logOutput('✗ ' + e.message, 'err');
+    try { await serial.write('\x03'); } catch {}
+  } finally {
+    state.running = false;
+    setBusy(false);
+    updateStatusBar();
+  }
+}
+
+/* ============================================================================
+   9. BINARY / BASE64 HELPERS
+   ============================================================================ */
+function bytesToBase64(bytes) {
+  let bin = '';
+  const CH = 0x8000;
+  for (let i = 0; i < bytes.length; i += CH)
+    bin += String.fromCharCode.apply(null, bytes.subarray(i, i + CH));
+  return btoa(bin);
+}
+function base64ToBytes(b64) {
+  const bin = atob(b64.replace(/\s+/g, ''));
+  const arr = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+  return arr;
+}
+function base64ToText(b64) { return dec.decode(base64ToBytes(b64)); }
+
+/* ============================================================================
+   10. UI / ESTADO
+   ============================================================================ */
+function setBusy(busy, text) {
+  const dot = $('#statusDot');
+  if (busy) {
+    dot.classList.add('busy');
+    if (text) $('#statusText').textContent = text;
+  } else {
+    dot.classList.remove('busy');
+    updateStatusBar();
+  }
+}
+
+function updateStatusBar() {
+  const dot = $('#statusDot');
+  if (serial.connected) {
+    dot.classList.add('online');
+    $('#statusText').textContent = state.running ? 'Ejecutando…' : 'Conectado';
+  } else {
+    dot.classList.remove('online');
+    $('#statusText').textContent = 'Desconectado';
+  }
+  $('#baudText').textContent = `${settings.baud} baud`;
+  ['btnRun','btnSave','btnSaveAs','btnInterrupt','btnReset'].forEach(id => {
+    $('#'+id).disabled = !serial.connected;
+  });
+  const btnC = $('#btnConnect');
+  if (serial.connected) {
+    btnC.classList.remove('primary');
+    btnC.classList.add('danger');
+    btnC.innerHTML = '<i data-lucide="plug-zap"></i><span>Desconectar</span>';
+  } else {
+    btnC.classList.add('primary');
+    btnC.classList.remove('danger');
+    btnC.innerHTML = '<i data-lucide="plug"></i><span>Conectar</span>';
+  }
+  refreshIcons();
+}
+
+serial.on('state', ({ connected, unexpected }) => {
+  updateStatusBar();
+  if (!connected) {
+    sidebarDisconnected();
+    $('#chipText').textContent = 'ESP32';
+    $('#versionText').textContent = 'v1.0.0';
+    if (unexpected) toast('La placa se desconectó (¿USB desenchufado?)', 'error', 5000);
+  }
+});
+
+/* ============================================================================
+   11. MENÚ CONTEXTUAL DEL EXPLORADOR
+   ============================================================================ */
+const ctxMenu = $('#ctxMenu');
+function showCtxMenu(x, y, fileName) {
+  ctxMenu.innerHTML = `
+    <div class="ctx-item" data-act="open"><i data-lucide="folder-open"></i> Abrir</div>
+    <div class="ctx-item" data-act="download"><i data-lucide="download"></i> Descargar al PC</div>
+    <div class="ctx-item" data-act="rename"><i data-lucide="pen-line"></i> Renombrar</div>
+    <div class="separator"></div>
+    <div class="ctx-item danger" data-act="delete"><i data-lucide="trash-2"></i> Eliminar</div>`;
+  ctxMenu.classList.remove('hidden');
+  const rect = ctxMenu.getBoundingClientRect();
+  ctxMenu.style.left = Math.min(x, window.innerWidth - rect.width - 8) + 'px';
+  ctxMenu.style.top  = Math.min(y, window.innerHeight - rect.height - 8) + 'px';
+  refreshIcons();
+  $$('.ctx-item', ctxMenu).forEach(item => {
+    item.addEventListener('click', () => {
+      hideCtxMenu();
+      const act = item.dataset.act;
+      if (act === 'open') openRemoteFile(fileName);
+      else if (act === 'download') downloadFile(fileName);
+      else if (act === 'rename') promptRename(fileName);
+      else if (act === 'delete') purgeFile(fileName);
+    });
+  });
+}
+function hideCtxMenu() { ctxMenu.classList.add('hidden'); }
+document.addEventListener('click', e => { if (!e.target.closest('#ctxMenu')) hideCtxMenu(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') hideCtxMenu(); });
+window.addEventListener('blur', hideCtxMenu);
+
+/* ============================================================================
+   12. EVENTOS DE BOTONES
+   ============================================================================ */
+$('#btnConnect').addEventListener('click', async () => {
+  if (serial.connected) {
+    await serial.disconnect();
+    toast('Desconectado', 'info');
+    return;
+  }
+  if (!('serial' in navigator)) {
+    toast('Tu navegador no soporta Web Serial API. Usa Chrome o Edge en escritorio.', 'error', 6000);
+    return;
+  }
+  try {
+    await serial.connect();
+    toast('Placa conectada', 'success');
+    term.clear();
+    term.writeln('\x1b[1;32m✓ Conectado a la placa\x1b[0m\r\n');
+    await sleep(400);
+    await serial.write('\x03'); await sleep(120);
+    await serial.write('\x03'); await sleep(250);
+
+    // Detectar chip y versión de MicroPython
+    try {
+      const info = await serial.rawExec(
+        "import sys, os\n" +
+        "u = os.uname()\n" +
+        "print('CHIP:' + u.machine)\n" +
+        "print('VER:' + u.version.split(' on ')[0].replace('MicroPython ', ''))\n",
+        4000
+      );
+      const chip = info.stdout.match(/CHIP:(.+)/)?.[1]?.trim();
+      const ver  = info.stdout.match(/VER:(.+)/)?.[1]?.trim();
+      if (chip) $('#chipText').textContent = chip;
+      if (ver)  $('#versionText').textContent = 'MP ' + ver;
+    } catch { /* no crítico */ }
+
+    await syncFilesystem(true);
+  } catch (e) {
+    if (e.name === 'NotFoundError') toast('No se seleccionó ningún puerto', 'warn');
+    else if (e.name === 'NetworkError') toast('No se pudo abrir el puerto. Cierra otros programas que lo usen (ej. Thonny) y reintenta.', 'error', 6000);
+    else toast('Error conectando: ' + e.message, 'error');
+    if (!serial.connected) updateStatusBar();
+  }
+});
+
+$('#btnRun').addEventListener('click', () => runInRam());
+$('#btnSave').addEventListener('click', () => saveActiveToDevice());
+$('#btnSaveAs').addEventListener('click', () => saveActiveAs());
+$('#btnInterrupt').addEventListener('click', async () => {
+  if (state.running) {
+    await serial.abortRaw();
+    toast('Ejecución interrumpida', 'info', 1600);
+  } else {
+    await serial.interrupt();
+    toast('Interrupción enviada (Ctrl+C)', 'info', 1600);
+  }
+});
+$('#btnReset').addEventListener('click', async () => {
+  await serial.softReset();
+  toast('Reiniciando placa…', 'info', 1600);
+});
+
+$('#btnNewFile').addEventListener('click', newFile);
+$('#btnUpload').addEventListener('click', triggerUpload);
+$('#btnRefresh').addEventListener('click', () => syncFilesystem(false));
+
+$('#btnTermClear').addEventListener('click', () => {
+  term.clear();
+  $('#outputPane').innerHTML = '';
+});
+$('#btnTermCollapse').addEventListener('click', () => {
+  const p = $('#termPanel');
+  const collapsed = p.dataset.collapsed === '1';
+  if (collapsed) {
+    p.style.height = p.dataset.prevH || '280px';
+    p.dataset.collapsed = '0';
+    $('#btnTermCollapse').innerHTML = '<i data-lucide="chevron-down"></i>';
+  } else {
+    p.dataset.prevH = p.style.height || '280px';
+    p.style.height = '32px';
+    p.dataset.collapsed = '1';
+    $('#btnTermCollapse').innerHTML = '<i data-lucide="chevron-up"></i>';
+  }
+  refreshIcons();
+  setTimeout(() => fitAddon.fit(), 250);
+});
+
+$('#btnTheme').addEventListener('click', () => {
+  applyTheme(settings.theme === 'dark' ? 'light' : 'dark');
+});
+
+/* ---------- Settings modal ---------- */
+function openSettings() {
+  $('#setTheme').value = settings.theme;
+  $('#setFontSize').value = settings.fontSize;
+  $('#setTabSize').value = settings.tabSize;
+  $('#setBaud').value = String(settings.baud);
+  $('#setAutocomplete').checked = settings.autocomplete;
+  $('#setLineNumbers').checked = settings.lineNumbers;
+  $('#setWordWrap').checked = settings.wordWrap;
+  $('#setAutoReconnect').checked = settings.autoReconnect;
+  openOverlay('settingsOverlay');
+}
+$('#btnSettings').addEventListener('click', openSettings);
+$('#btnSaveSettings').addEventListener('click', () => {
+  settings.theme = $('#setTheme').value;
+  settings.fontSize = Math.min(24, Math.max(10, +$('#setFontSize').value || 13.5));
+  settings.tabSize = Math.min(8, Math.max(2, +$('#setTabSize').value || 4));
+  settings.baud = +$('#setBaud').value;
+  settings.autocomplete = $('#setAutocomplete').checked;
+  settings.lineNumbers = $('#setLineNumbers').checked;
+  settings.wordWrap = $('#setWordWrap').checked;
+  settings.autoReconnect = $('#setAutoReconnect').checked;
+  saveSettings(settings);
+  applyTheme(settings.theme);
+  applyEditorFont();
+  cm.setOption('tabSize', settings.tabSize);
+  cm.setOption('indentUnit', settings.tabSize);
+  cm.setOption('lineNumbers', settings.lineNumbers);
+  cm.setOption('lineWrapping', settings.wordWrap);
+  $('#baudText').textContent = `${settings.baud} baud`;
+  closeOverlay('settingsOverlay');
+  toast('Ajustes guardados', 'success');
+});
+
+/* ============================================================================
+   13. PALETA DE COMANDOS
+   ============================================================================ */
+const COMMANDS = [
+  { id:'connect',   label:'Conectar / Desconectar placa',    icon:'plug',       key:'Ctrl+K',       run: () => $('#btnConnect').click() },
+  { id:'run',       label:'Ejecutar en RAM',                 icon:'play',       key:'F5',           run: runInRam },
+  { id:'save',      label:'Guardar en la placa',             icon:'save',       key:'Ctrl+S',       run: saveActiveToDevice },
+  { id:'saveAs',    label:'Guardar como… (en la placa)',     icon:'save-all',   key:'Ctrl+Shift+S', run: saveActiveAs },
+  { id:'export',    label:'Exportar pestaña activa al PC',   icon:'file-down',  key:'',             run: exportActiveDoc },
+  { id:'newFile',   label:'Nuevo archivo',                   icon:'file-plus',  key:'Ctrl+N',       run: newFile },
+  { id:'upload',    label:'Subir archivo del PC',            icon:'upload',     key:'',             run: triggerUpload },
+  { id:'refresh',   label:'Actualizar explorador',           icon:'refresh-cw', key:'',             run: () => syncFilesystem() },
+  { id:'interrupt', label:'Interrumpir ejecución',           icon:'square',     key:'Ctrl+C',       run: () => $('#btnInterrupt').click() },
+  { id:'reset',     label:'Reiniciar placa (soft reset)',    icon:'rotate-ccw', key:'Ctrl+R',       run: () => serial.softReset() },
+  { id:'clearTerm', label:'Limpiar terminal y salida',       icon:'trash-2',    key:'',             run: () => { term.clear(); $('#outputPane').innerHTML = ''; } },
+  { id:'theme',     label:'Cambiar tema (claro/oscuro)',     icon:'moon',       key:'Ctrl+Shift+D', run: () => applyTheme(settings.theme === 'dark' ? 'light' : 'dark') },
+  { id:'settings',  label:'Abrir ajustes',                   icon:'settings',   key:'Ctrl+,',       run: openSettings },
+  { id:'shortcuts', label:'Ver atajos de teclado',           icon:'keyboard',   key:'?',            run: openShortcuts },
+  { id:'about',     label:'Acerca de EspWebStudio',          icon:'info',       key:'',             run: openAbout },
+  { id:'readme',    label:'Ver README (documentación)',      icon:'book-open',  key:'',             run: () => openDocs('readme') },
+  { id:'license',   label:'Ver licencia MIT',                icon:'scale',      key:'',             run: () => openDocs('license') },
+  { id:'closeTab',  label:'Cerrar pestaña activa',           icon:'x',          key:'Ctrl+W',       run: () => { if (state.activeId) closeDoc(state.activeId); } },
+];
+
+let cmdSelectedIdx = 0;
+let cmdFiltered = [...COMMANDS];
+
+function openCommandPalette() {
+  cmdSelectedIdx = 0;
+  cmdFiltered = [...COMMANDS];
+  $('#cmdInput').value = '';
+  renderCommandList();
+  openOverlay('cmdOverlay');
+  setTimeout(() => $('#cmdInput').focus(), 30);
+}
+$('#btnCommand').addEventListener('click', openCommandPalette);
+
+function renderCommandList() {
+  const list = $('#cmdList');
+  list.innerHTML = '';
+  if (!cmdFiltered.length) {
+    list.innerHTML = `<div style="padding:20px; text-align:center; color:var(--text-3); font-size:13px;">Sin resultados</div>`;
+    return;
+  }
+  cmdFiltered.forEach((cmd, i) => {
+    const el = document.createElement('div');
+    el.className = 'cmd-item' + (i === cmdSelectedIdx ? ' selected' : '');
+    el.innerHTML = `<i data-lucide="${cmd.icon}"></i><span>${cmd.label}</span>` +
+                   (cmd.key ? `<span class="cmd-key">${cmd.key}</span>` : '');
+    el.addEventListener('click', () => { closeOverlay('cmdOverlay'); cmd.run(); });
+    el.addEventListener('mousemove', () => {
+      if (cmdSelectedIdx !== i) { cmdSelectedIdx = i; renderCommandList(); }
+    });
+    list.appendChild(el);
+  });
+  refreshIcons();
+}
+$('#cmdInput').addEventListener('input', e => {
+  const q = e.target.value.toLowerCase().trim();
+  cmdFiltered = COMMANDS.filter(c => c.label.toLowerCase().includes(q));
+  cmdSelectedIdx = 0;
+  renderCommandList();
+});
+$('#cmdInput').addEventListener('keydown', e => {
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    cmdSelectedIdx = Math.min(cmdSelectedIdx + 1, cmdFiltered.length - 1);
+    renderCommandList();
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    cmdSelectedIdx = Math.max(cmdSelectedIdx - 1, 0);
+    renderCommandList();
+  } else if (e.key === 'Enter') {
+    e.preventDefault();
+    const cmd = cmdFiltered[cmdSelectedIdx];
+    if (cmd) { closeOverlay('cmdOverlay'); cmd.run(); }
+  }
+});
+
+/* ============================================================================
+   14. PANEL DE ATAJOS
+   ============================================================================ */
+function openShortcuts() {
+  const groups = [
+    { title:'General', items: [
+      ['Paleta de comandos', 'Ctrl+Shift+P'],
+      ['Ajustes', 'Ctrl+,'],
+      ['Cambiar tema', 'Ctrl+Shift+D'],
+      ['Atajos de teclado', '?'],
+    ]},
+    { title:'Placa', items: [
+      ['Conectar / Desconectar', 'Ctrl+K'],
+      ['Ejecutar en RAM', 'F5'],
+      ['Guardar en la placa', 'Ctrl+S'],
+      ['Guardar como', 'Ctrl+Shift+S'],
+      ['Interrumpir ejecución', 'Ctrl+C / botón Detener'],
+      ['Reiniciar placa', 'Ctrl+R'],
+    ]},
+    { title:'Editor', items: [
+      ['Nuevo archivo', 'Ctrl+N'],
+      ['Cerrar pestaña', 'Ctrl+W'],
+      ['Buscar', 'Ctrl+F'],
+      ['Buscar y reemplazar', 'Ctrl+Shift+F'],
+      ['Ir a línea', 'Ctrl+G'],
+      ['Autocompletar', 'Ctrl+Espacio'],
+      ['Comentar línea', 'Ctrl+/'],
+      ['Indentar / Desindentar', 'Tab / Shift+Tab'],
+    ]},
+  ];
+  $('#shortcutsBody').innerHTML = groups.map(g => `
+    <div class="shortcut-group-title">${g.title}</div>
+    ${g.items.map(([label, key]) => `
+      <div class="shortcut-row">
+        <span class="label">${label}</span>
+        <kbd>${key}</kbd>
+      </div>`).join('')}
+  `).join('');
+  openOverlay('shortcutsOverlay');
+}
+
+/* ============================================================================
+   15. ACERCA DE
+   ============================================================================ */
+function openAbout() { openDocs('about'); }
+
+
+/* ============================================================================
+   15b. DOCUMENTACIÓN INTEGRADA (README + LICENCIA)
+   ============================================================================ */
+const README_TEXT = `ESPWebStudio — IDE MicroPython para ESP32
+=========================================
+
+IDE web profesional para programar placas ESP32 (C3 Super Mini, S3,
+clasico...) con MicroPython, directamente desde el navegador.
+
+  100% cliente · Sin backend · Web Serial API · Un unico archivo HTML
+
+
+CARACTERISTICAS
+---------------
+- Editor profesional (CodeMirror 5): resaltado de sintaxis Python,
+  autocompletado de la API de MicroPython (machine, network, esp32...),
+  plegado de codigo, busqueda/reemplazo y numeros de linea.
+- Explorador de archivos en la placa: listar, abrir, crear, renombrar,
+  eliminar, subir y descargar archivos, con espacio libre (os.statvfs).
+- Terminal REPL interactiva (xterm.js).
+- Panel de Salida: stdout/stderr capturados por separado, como Thonny.
+- Ejecutar en RAM (F5) con interrupcion real de la ejecucion.
+- Guardado seguro en flash: transferencia binaria via Base64 en bloques.
+- Deteccion automatica del chip y la version de MicroPython.
+- Paleta de comandos (Ctrl+Shift+P), menu contextual, atajos de teclado.
+- Temas claro/oscuro y ajustes persistentes (localStorage).
+- Reconexion automatica con el ultimo puerto autorizado.
+
+
+INICIO RAPIDO
+-------------
+Requisito: navegador con Web Serial API -> Chrome o Edge de ESCRITORIO.
+
+1) GitHub Pages: sube este index.html a un repositorio y activa
+   Settings -> Pages -> rama main (carpeta /root). Abre la URL.
+2) Local SIN servidor: descarga index.html y abrelo con doble clic
+   (Chrome/Edge lo tratan como contexto seguro).
+3) Conecta tu ESP32-C3 por USB y pulsa CONECTAR. Autoriza el puerto.
+
+
+PREPARAR EL ESP32-C3 SUPER MINI
+-------------------------------
+1) Instala el firmware MicroPython:
+   https://micropython.org/download/ESP32_GENERIC_C3/
+2) Conecta la placa por USB. Si el puerto esta ocupado por Thonny,
+   el monitor serie u otro programa, cierralo antes de conectar.
+
+
+ATAJOS DE TECLADO
+-----------------
+  Ctrl+K           Conectar / Desconectar
+  F5               Ejecutar en RAM
+  Ctrl+S           Guardar en la placa
+  Ctrl+Shift+S     Guardar como
+  Ctrl+C           Interrumpir ejecucion (boton Detener)
+  Ctrl+R           Reiniciar placa
+  Ctrl+Shift+P     Paleta de comandos
+  Ctrl+,           Ajustes
+  Ctrl+Shift+D     Cambiar tema
+  ?                Atajos de teclado
+
+
+COMO FUNCIONA
+-------------
+- Conexion: Web Serial API (navigator.serial), 115200 baud configurable.
+- Ejecucion y archivos: modo Raw REPL de MicroPython (Ctrl-A / Ctrl-D)
+  con transferencia binaria tolerante via Base64 (ubinascii).
+- Interrupcion: Ctrl-B (salir de Raw REPL) + Ctrl-C al interprete.
+- Sin backend, sin build, sin dependencias locales: solo CDNs.
+
+
+HOJA DE RUTA
+------------
+[ ] Subida multiple de archivos
+[ ] Gestor de paquetes (mip / upip) desde la paleta
+[ ] Monitor de heap y WiFi en la barra de estado
+[ ] Tema automatico segun el sistema
+[ ] i18n (espanol / ingles)
+
+
+CONTRIBUIR
+----------
+Abre un issue o pull request. Manten el proyecto como app de un solo
+archivo (sin build step) y valida el JS (node --check) antes de enviar.
+
+
+LICENCIA
+--------
+MIT. Ver la pestana «Licencia MIT» de esta ventana o el archivo LICENSE.
+`;
+const LICENSE_TEXT = `MIT License
+
+Copyright (c) 2026 EspWebStudio contributors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+`;
+const ABOUT_TEXT = `EspWebStudio v1.0.0
+IDE MicroPython para placas ESP32 (C3 Super Mini, S3, clasico...)
+
+Un IDE web 100% cliente, sin backend, que se comunica con tu placa
+mediante la Web Serial API del navegador. Todo el codigo, la
+documentacion (README) y la licencia viven en UN UNICO archivo HTML.
+
+- Editor CodeMirror 5 con autocompletado MicroPython
+- Explorador de archivos en la placa (crear, borrar, renombrar,
+  subir, descargar)
+- Terminal REPL interactiva (xterm.js) + panel de salida capturada
+- Ejecucion en RAM con interrupcion y guardado seguro (Base64)
+
+Dependencias (CDN): CodeMirror 5, xterm.js, Lucide Icons.
+
+Licencia: MIT. Hecho con carino para la comunidad maker.`;
+
+function renderDoc(tab) {
+  $$('#docsOverlay [data-doc]').forEach(t => t.classList.toggle('active', t.dataset.doc === tab));
+  const pane = $('#docPane');
+  const body = tab === 'readme' ? README_TEXT : tab === 'license' ? LICENSE_TEXT : ABOUT_TEXT;
+  pane.innerHTML = '<pre style="white-space:pre-wrap; font-family:var(--font-mono); font-size:12.5px; line-height:1.65; color:var(--text-2); margin:0;">' +
+                   escapeHtml(body) + '</pre>';
+  pane.scrollTop = 0;
+}
+function openDocs(tab='readme') {
+  renderDoc(tab);
+  openOverlay('docsOverlay');
+}
+$$('#docsOverlay [data-doc]').forEach(t => t.addEventListener('click', () => renderDoc(t.dataset.doc)));
+
+/* ============================================================================
+   16. ATAJOS GLOBALES
+   ============================================================================ */
+document.addEventListener('keydown', e => {
+  const inEditor = e.target.closest('.CodeMirror');
+  const inInput = e.target.closest('input, textarea, select');
+  const mod = e.ctrlKey || e.metaKey;
+
+  if (mod && e.shiftKey && (e.key === 'P' || e.key === 'p')) {
+    e.preventDefault(); openCommandPalette(); return;
+  }
+  if (mod && e.shiftKey && (e.key === 'D' || e.key === 'd')) {
+    e.preventDefault(); applyTheme(settings.theme === 'dark' ? 'light' : 'dark'); return;
+  }
+  if (mod && e.key === ',') { e.preventDefault(); openSettings(); return; }
+  if (!inEditor && !inInput && e.key === '?' && !mod) { e.preventDefault(); openShortcuts(); return; }
+  if (mod && e.key.toLowerCase() === 'k') { e.preventDefault(); $('#btnConnect').click(); return; }
+  if (e.key === 'F5') { e.preventDefault(); runInRam(); return; }
+  if (mod && !e.shiftKey && e.key.toLowerCase() === 's') {
+    e.preventDefault(); saveActiveToDevice(); return;
+  }
+  if (mod && e.shiftKey && e.key.toLowerCase() === 's') {
+    e.preventDefault(); saveActiveAs(); return;
+  }
+  if (mod && e.key.toLowerCase() === 'n') { e.preventDefault(); newFile(); return; }
+  if (mod && e.key.toLowerCase() === 'w') {
+    if (state.docs.length) { e.preventDefault(); closeDoc(state.activeId); }
+    return;
+  }
+  if (mod && e.key.toLowerCase() === 'r' && !inEditor) {
+    e.preventDefault(); serial.softReset(); return;
+  }
+});
+
+/* ============================================================================
+   17. REDIMENSIONAR TERMINAL
+   ============================================================================ */
+(function termResize() {
+  const handle = $('#termResizer');
+  const panel  = $('#termPanel');
+  let dragging = false, startY = 0, startH = 0;
+  handle.addEventListener('mousedown', e => {
+    dragging = true;
+    startY = e.clientY;
+    startH = panel.offsetHeight;
+    document.body.style.userSelect = 'none';
+    document.body.style.cursor = 'ns-resize';
+  });
+  document.addEventListener('mousemove', e => {
+    if (!dragging) return;
+    const delta = startY - e.clientY;
+    const newH = Math.max(90, Math.min(window.innerHeight - 200, startH + delta));
+    panel.style.height = newH + 'px';
+    fitAddon.fit();
+  });
+  document.addEventListener('mouseup', () => {
+    if (!dragging) return;
+    dragging = false;
+    document.body.style.userSelect = '';
+    document.body.style.cursor = '';
+  });
+})();
+
+/* ============================================================================
+   18. ANTES DE CERRAR LA PÁGINA
+   ============================================================================ */
+window.addEventListener('beforeunload', e => {
+  if (state.docs.some(d => d.dirty)) {
+    e.preventDefault();
+    e.returnValue = '';
+  }
+});
+
+/* ============================================================================
+   19. AUTO-RECONNECT (Web Serial getPorts)
+   ============================================================================ */
+(async function tryAutoReconnect() {
+  if (!('serial' in navigator)) {
+    if (!window.location.protocol.startsWith('http')) return;
+    toast('Tu navegador no soporta Web Serial API. Usa Chrome o Edge en escritorio.', 'warn', 6000);
+    return;
+  }
+  if (!settings.autoReconnect) return;
+  try {
+    const ports = await navigator.serial.getPorts();
+    if (ports.length) {
+      const ok = confirm('Se encontró una placa previamente autorizada. ¿Reconectar?');
+      if (ok) {
+        await serial.reconnect(ports[0]);
+        toast('Reconectado', 'success');
+        await sleep(400);
+        await serial.write('\x03'); await sleep(200);
+        await syncFilesystem(true);
+      }
+    }
+  } catch { /* ignore */ }
+})();
+
+/* ============================================================================
+   20. ARRANQUE + PWA
+   ============================================================================ */
+function boot() {
+  sidebarDisconnected();
+  newDoc('main.py', '', true);
+  updateStatusBar();
+  refreshIcons();
+
+  const savedH = localStorage.getItem('espwebstudio.termH');
+  if (savedH) $('#termPanel').style.height = savedH + 'px';
+  setTimeout(() => fitAddon.fit(), 60);
+
+  setInterval(() => {
+    const h = $('#termPanel').offsetHeight;
+    if (h) localStorage.setItem('espwebstudio.termH', String(h));
+  }, 1500);
+
+}
+boot();
+
+/* API pública para depuración / extensiones */
+window.EspWebStudio = { serial, term, cm, state, settings, toast, runInRam, syncFilesystem };
+
+})();
+</script>
+</body>
+</html>
