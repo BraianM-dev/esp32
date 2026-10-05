@@ -744,6 +744,7 @@ html[data-theme="light"] .cm-s-default .cm-builtin { color: #b45309; }
   .topbar-actions .btn { padding: 0; width: 34px; justify-content: center; }
 }
 </style>
+<base target="_blank">
 </head>
 
 <body>
@@ -1022,7 +1023,7 @@ html[data-theme="light"] .cm-s-default .cm-builtin { color: #b45309; }
 
 <script>
 /* ============================================================================
-   EspWebStudio v1.0.0 — IDE MicroPython para ESP32
+   EspWebStudio v1.0.2 — IDE MicroPython para ESP32
    ---------------------------------------------------------------------------
    100% cliente. Sin backend. Web Serial API + CodeMirror 5 + xterm.js.
    Licencia: MIT
@@ -1181,8 +1182,14 @@ class SerialManager {
         const payload = this.rawBuffer.slice(0, end);
         this.rawBuffer = '';
         const split = payload.indexOf('\x04');
-        const stdout = split >= 0 ? payload.slice(0, split) : payload;
+        let stdout = split >= 0 ? payload.slice(0, split) : payload;
         const stderr = split >= 0 ? payload.slice(split + 1) : '';
+        // El firmware confirma el Ctrl-D con "OK" PEGADO a la salida
+        // (documentado en MicroPython: "The Ctrl-D will be acknowledged
+        // by 'OK'"). Ej. real: "OKHola Mundo\r\n". Lo descartamos.
+        if (stdout.startsWith('OK') && !stdout.startsWith('OK\r') && !stdout.startsWith('OK\n')) {
+          stdout = stdout.slice(2);
+        }
         clearTimeout(this.rawTimer);
         this.rawTimer = null;
         const resolve = this.rawResolver;
@@ -1223,9 +1230,17 @@ class SerialManager {
     await this.write('\x01');     // Ctrl-A → Raw REPL
 
     const t0 = Date.now();
-    while (Date.now() - t0 < 1500) {
+    while (Date.now() - t0 < 2500) {
       if (this.rawBuffer.includes('raw REPL') && this.rawBuffer.includes('>')) break;
-      await sleep(15);
+      await sleep(10);
+    }
+    // Drenar bytes rezagados del banner (prompt partido en varios chunks)
+    let lastLen = -1;
+    const t1 = Date.now();
+    while (Date.now() - t1 < 300) {
+      await sleep(30);
+      if (this.rawBuffer.length === lastLen) break;
+      lastLen = this.rawBuffer.length;
     }
     this.rawBuffer = '';
 
@@ -1282,7 +1297,7 @@ term.onData(data => {
 });
 window.addEventListener('resize', () => fitAddon.fit());
 
-term.writeln('\x1b[1;36m  EspWebStudio v1.0.0\x1b[0m');
+term.writeln('\x1b[1;36m  EspWebStudio v1.0.2\x1b[0m');
 term.writeln('\x1b[90m  IDE MicroPython para placas ESP32 (C3, S3, clásico…)\x1b[0m');
 term.writeln('');
 term.writeln('\x1b[33m▸ Conecta tu placa por USB con Chrome o Edge (Web Serial API)\x1b[0m');
@@ -1424,6 +1439,7 @@ const state = {
   activeId: null,
   deviceFiles: [],
   running: false,
+  cwd: '/',
 };
 
 function newDoc(name=null, content='', isLocal=true) {
@@ -1452,7 +1468,7 @@ function activateDoc(id) {
   doc.dirty = false;
   renderTabs();
   updateEditorMode();
-  if (!doc.isLocal && doc.name) highlightActiveFile(doc.name);
+  if (!doc.isLocal) highlightActiveFile(doc.devicePath || doc.name);
 }
 
 function closeDoc(id) {
@@ -1532,37 +1548,47 @@ async function syncFilesystem(silent=false) {
   try {
     const code =
       "import os, json\n" +
+      `cwd = '${pyStr(state.cwd)}'\n` +
+      "res = []\n" +
       "try:\n" +
-      "    files = sorted(os.listdir())\n" +
-      "    print(json.dumps(files))\n" +
+      "    for n in sorted(os.listdir(cwd)):\n" +
+      "        p = (cwd if cwd.endswith('/') else cwd + '/') + n\n" +
+      "        try:\n" +
+      "            mode = os.stat(p)[0]\n" +
+      "            isdir = 1 if (mode & 0o170000) == 0o040000 else 0\n" +
+      "        except Exception:\n" +
+      "            isdir = 0\n" +
+      "        res.append([n, isdir])\n" +
       "except Exception:\n" +
-      "    print(json.dumps([]))\n" +
+      "    pass\n" +
+      "print(json.dumps(res))\n" +
       "try:\n" +
-      "    s = os.statvfs('/')\n" +
+      "    s = os.statvfs(cwd)\n" +
       "    print('FS:%d:%d' % (s[0]*s[3], s[0]*s[2]))\n" +
       "except Exception:\n" +
       "    pass\n";
-    const { stdout } = await serial.rawExec(code, 4000);
-    const lines = stdout.trim().split('\n').filter(Boolean);
-    const jsonLine = lines.find(l => l.trim().startsWith('[')) || '[]';
-    const files = JSON.parse(jsonLine);
+    const { stdout } = await serial.rawExec(code, 5000);
+    const m = stdout.match(/\[[\s\S]*\]/);
+    let files = [];
+    try { files = m ? JSON.parse(m[0]) : []; } catch { files = []; }
+    if (!Array.isArray(files)) files = [];
     state.deviceFiles = files;
     renderFileList(files);
 
-    const fsLine = lines.find(l => l.startsWith('FS:'));
-    if (fsLine) {
-      const [, free, total] = fsLine.split(':');
-      $('#fsInfo').textContent = `${files.length} arch · ${formatKB(+free)} libres de ${formatKB(+total)}`;
-    } else {
-      $('#fsInfo').textContent = `${files.length} archivo${files.length !== 1 ? 's' : ''}`;
-    }
-    if (!silent) toast(`Explorador actualizado: ${files.length} archivo(s)`, 'info', 2000);
+    const fsm = stdout.match(/FS:(\d+):(\d+)/);
+    const loc = state.cwd;
+    $('#fsInfo').textContent = fsm
+      ? `${loc} · ${files.length} elem · ${formatKB(+fsm[1])} libres de ${formatKB(+fsm[2])}`
+      : `${loc} · ${files.length} elemento(s)`;
+    if (!silent) toast(`Explorador actualizado: ${files.length} elemento(s)`, 'info', 2000);
   } catch (e) {
+    console.warn('syncFilesystem:', e);
     if (!silent) toast('Error listando archivos: ' + e.message, 'error');
   }
 }
 
 function sidebarDisconnected() {
+  state.cwd = '/';
   $('#fileList').innerHTML = `
     <div class="empty-state">
       <i data-lucide="usb"></i>
@@ -1572,10 +1598,23 @@ function sidebarDisconnected() {
   $('#fsInfo').textContent = 'Sin conexión';
 }
 
+function joinPath(cwd, name) { return cwd === '/' ? `/${name}` : `${cwd}${name}`; }
+
+function navTo(name) {
+  if (name === '..') {
+    const parts = state.cwd.split('/').filter(Boolean);
+    parts.pop();
+    state.cwd = parts.length ? '/' + parts.join('/') + '/' : '/';
+  } else {
+    state.cwd = state.cwd === '/' ? `/${name}/` : `${state.cwd}${name}/`;
+  }
+  syncFilesystem(true);
+}
+
 function renderFileList(files) {
   const list = $('#fileList');
   list.innerHTML = '';
-  if (!files.length) {
+  if (!files.length && state.cwd === '/') {
     list.innerHTML = `
       <div class="empty-state">
         <i data-lucide="folder-open"></i>
@@ -1584,47 +1623,62 @@ function renderFileList(files) {
     refreshIcons();
     return;
   }
-  files.forEach(name => {
+  const items = [...files];
+  if (state.cwd !== '/') items.unshift(['..', 1]);
+  if (!files.length) {
+    const note = document.createElement('div');
+    note.style.cssText = 'padding:6px 12px; font-size:11.5px; color:var(--text-3);';
+    note.textContent = 'Carpeta vacía';
+    list.appendChild(note);
+  }
+  items.forEach(([name, isDir]) => {
     const item = document.createElement('div');
     item.className = 'file-item';
     item.dataset.name = name;
+    const fullPath = name === '..' ? null : joinPath(state.cwd, name);
+    if (fullPath) item.dataset.path = fullPath;
     item.innerHTML = `
-      <i data-lucide="file-code-2" class="file-icon"></i>
+      <i data-lucide="${isDir ? 'folder' : 'file-code-2'}" class="file-icon"></i>
       <span class="file-name">${escapeHtml(name)}</span>
+      ${isDir ? '' : `
       <span class="file-more">
         <button class="icon-btn" data-act="download" title="Descargar al PC"><i data-lucide="download"></i></button>
         <button class="icon-btn" data-act="rename"   title="Renombrar"><i data-lucide="pen-line"></i></button>
         <button class="icon-btn" data-act="delete"   title="Eliminar"><i data-lucide="trash-2"></i></button>
-      </span>`;
+      </span>`}`;
     item.addEventListener('click', e => {
+      if (isDir) { navTo(name); return; }
       const act = e.target.closest('[data-act]')?.dataset.act;
-      if (act === 'delete')   { e.stopPropagation(); purgeFile(name); return; }
-      if (act === 'rename')   { e.stopPropagation(); promptRename(name); return; }
-      if (act === 'download') { e.stopPropagation(); downloadFile(name); return; }
-      openRemoteFile(name);
+      if (act === 'delete')   { e.stopPropagation(); purgeFile(fullPath); return; }
+      if (act === 'rename')   { e.stopPropagation(); promptRename(fullPath); return; }
+      if (act === 'download') { e.stopPropagation(); downloadFile(fullPath); return; }
+      openRemoteFile(fullPath);
     });
-    item.addEventListener('contextmenu', e => {
-      e.preventDefault();
-      showCtxMenu(e.clientX, e.clientY, name);
-    });
+    if (!isDir) {
+      item.addEventListener('contextmenu', e => {
+        e.preventDefault();
+        showCtxMenu(e.clientX, e.clientY, fullPath);
+      });
+    }
     list.appendChild(item);
   });
   refreshIcons();
 }
 
-function highlightActiveFile(name) {
-  $$('.file-item').forEach(el => el.classList.toggle('active', el.dataset.name === name));
+function highlightActiveFile(path) {
+  $$('.file-item').forEach(el => el.classList.toggle('active', el.dataset.path === path));
 }
 
-async function openRemoteFile(name) {
-  const existing = state.docs.find(d => !d.isLocal && d.name === name);
+async function openRemoteFile(path) {
+  const base = path.split('/').pop();
+  const existing = state.docs.find(d => !d.isLocal && d.devicePath === path);
   if (existing) { activateDoc(existing.id); return; }
 
   setBusy(true);
   try {
     const code =
       "import ubinascii\n" +
-      `f = open('${pyStr(name)}', 'rb')\n` +
+      `f = open('${pyStr(path)}', 'rb')\n` +
       "data = f.read()\n" +
       "f.close()\n" +
       "print(ubinascii.b2a_base64(data).decode())\n";
@@ -1632,7 +1686,8 @@ async function openRemoteFile(name) {
     if (stderr && stderr.trim()) throw new Error(stderr.trim());
     const b64 = (stdout.trim().split('\n').pop() || '').trim();
     const content = b64 ? base64ToText(b64) : '';
-    newDoc(name, content, false);
+    const doc = newDoc(base, content, false);
+    doc.devicePath = path;
   } catch (e) {
     toast('Error abriendo archivo: ' + e.message, 'error');
   } finally {
@@ -1640,35 +1695,40 @@ async function openRemoteFile(name) {
   }
 }
 
-async function purgeFile(name) {
-  if (!confirm(`¿Eliminar definitivamente "${name}" de la placa?`)) return;
+async function purgeFile(path) {
+  const base = path.split('/').pop();
+  if (!confirm(`¿Eliminar definitivamente "${base}" de la placa?`)) return;
   setBusy(true);
   try {
-    await serial.rawExec(`import os\nos.remove('${pyStr(name)}')\n`, 4000);
-    const doc = state.docs.find(d => !d.isLocal && d.name === name);
+    await serial.rawExec(
+      `import os\ntry:\n    os.remove('${pyStr(path)}')\nexcept Exception:\n    os.rmdir('${pyStr(path)}')\n`,
+      4000
+    );
+    const doc = state.docs.find(d => !d.isLocal && d.devicePath === path);
     if (doc) { doc.dirty = false; closeDoc(doc.id); }
     await syncFilesystem(true);
-    toast(`"${name}" eliminado`, 'success');
+    toast(`"${base}" eliminado`, 'success');
   } catch (e) {
     toast('Error eliminando: ' + e.message, 'error');
   } finally { setBusy(false); }
 }
 
-async function downloadFile(name) {
+async function downloadFile(path) {
+  const base = path.split('/').pop();
   try {
     const code =
       "import ubinascii\n" +
-      `f = open('${pyStr(name)}', 'rb')\n` +
+      `f = open('${pyStr(path)}', 'rb')\n` +
       "data = f.read()\nf.close()\n" +
       "print(ubinascii.b2a_base64(data).decode())\n";
     const { stdout } = await serial.rawExec(code, 8000);
     const b64 = (stdout.trim().split('\n').pop() || '').trim();
     const blob = new Blob([base64ToBytes(b64)], { type: 'application/octet-stream' });
     const url = URL.createObjectURL(blob);
-    const a = Object.assign(document.createElement('a'), { href: url, download: name });
+    const a = Object.assign(document.createElement('a'), { href: url, download: base });
     a.click();
     URL.revokeObjectURL(url);
-    toast(`Descargado: ${name}`, 'success');
+    toast(`Descargado: ${base}`, 'success');
   } catch (e) {
     toast('Error descargando: ' + e.message, 'error');
   }
@@ -1676,22 +1736,25 @@ async function downloadFile(name) {
 
 /* ---------- Renombrar (modal) ---------- */
 let renamingFile = null;
-function promptRename(name) {
-  renamingFile = name;
-  $('#renameInput').value = name;
+function promptRename(path) {
+  renamingFile = path;
+  $('#renameInput').value = path.split('/').pop();
   openOverlay('renameOverlay');
   setTimeout(() => { const inp = $('#renameInput'); inp.focus(); inp.select(); }, 50);
 }
 $('#renameConfirm').addEventListener('click', async () => {
   const newName = $('#renameInput').value.trim();
-  if (!newName || newName === renamingFile) { closeOverlay('renameOverlay'); return; }
+  const oldBase = renamingFile.split('/').pop();
+  if (!newName || newName === oldBase) { closeOverlay('renameOverlay'); return; }
   if (!/^[\w.\-]+$/.test(newName)) { toast('Nombre inválido (usa letras, números, _ - .)', 'error'); return; }
   closeOverlay('renameOverlay');
   setBusy(true);
   try {
-    await serial.rawExec(`import os\nos.rename('${pyStr(renamingFile)}', '${pyStr(newName)}')\n`, 4000);
-    const doc = state.docs.find(d => !d.isLocal && d.name === renamingFile);
-    if (doc) { doc.name = newName; doc.dirty = false; renderTabs(); updateEditorMode(); }
+    const dir = renamingFile.slice(0, renamingFile.length - oldBase.length);
+    const newPath = dir + newName;
+    await serial.rawExec(`import os\nos.rename('${pyStr(renamingFile)}', '${pyStr(newPath)}')\n`, 4000);
+    const doc = state.docs.find(d => !d.isLocal && d.devicePath === renamingFile);
+    if (doc) { doc.name = newName; doc.devicePath = newPath; doc.dirty = false; renderTabs(); updateEditorMode(); }
     await syncFilesystem(true);
     toast(`Renombrado a "${newName}"`, 'success');
   } catch (e) {
@@ -1707,6 +1770,7 @@ async function saveActiveToDevice() {
   if (!doc.name) { toast('Este documento no tiene nombre. Usa «Guardar como» (Ctrl+Shift+S).', 'warn'); return; }
   if (!serial.connected) { toast('Conecta la placa primero', 'warn'); return; }
 
+  const target = doc.devicePath || joinPath(state.cwd, doc.name);
   doc.content = cm.getValue();
   setBusy(true, `Guardando ${doc.name}…`);
   try {
@@ -1716,7 +1780,7 @@ async function saveActiveToDevice() {
     for (let i = 0; i < b64.length; i += CHUNK) py += `b64 += '${b64.slice(i, i + CHUNK)}'\n`;
     py += "try:\n";
     py += "    data = ubinascii.a2b_base64(b64)\n";
-    py += `    f = open('${pyStr(doc.name)}', 'wb')\n`;
+    py += `    f = open('${pyStr(target)}', 'wb')\n`;
     py += "    f.write(data)\n    f.close()\n    print('OK')\n";
     py += "except Exception as e:\n    print('ERR:' + str(e))\n";
 
@@ -1726,11 +1790,12 @@ async function saveActiveToDevice() {
     }
     doc.dirty = false;
     doc.isLocal = false;
+    doc.devicePath = target;
     renderTabs();
     updateEditorMode();
     toast(`"${doc.name}" guardado en la placa`, 'success');
     await syncFilesystem(true);
-    if (!doc.isLocal && doc.name) highlightActiveFile(doc.name);
+    highlightActiveFile(target);
   } catch (e) {
     toast('Error guardando: ' + e.message, 'error', 5000);
   } finally {
@@ -1882,7 +1947,7 @@ serial.on('state', ({ connected, unexpected }) => {
   if (!connected) {
     sidebarDisconnected();
     $('#chipText').textContent = 'ESP32';
-    $('#versionText').textContent = 'v1.0.0';
+    $('#versionText').textContent = 'v1.0.2';
     if (unexpected) toast('La placa se desconectó (¿USB desenchufado?)', 'error', 5000);
   }
 });
@@ -2283,7 +2348,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 `;
-const ABOUT_TEXT = `EspWebStudio v1.0.0
+const ABOUT_TEXT = `EspWebStudio v1.0.2
 IDE MicroPython para placas ESP32 (C3 Super Mini, S3, clasico...)
 
 Un IDE web 100% cliente, sin backend, que se comunica con tu placa
