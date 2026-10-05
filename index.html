@@ -1157,16 +1157,39 @@ for ssid, bssid, canal, rssi, seguridad, oculta in sta.scan():
 import network
 import time
 
-# La placa debe estar conectada previamente como estación.
-sta = network.WLAN(network.WLAN.IF_STA)
+# 1. Creamos el objeto Wi-Fi en modo Estación (STA_IF)
+sta = network.WLAN(network.STA_IF)
+
+# 2. Verificamos si el ESP32 YA está conectado a internet/router
 if not sta.isconnected():
-    print("Primero ejecuta el ejemplo Modo STA y configura tu red.")
+    print("Error: El ESP32 no está conectado a ninguna red Wi-Fi.")
+    print("Primero debes conectarlo a tu router usando wifi.connect('Tu_SSID', 'Tu_Clave')")
 else:
+    print("Conectado con éxito. Iniciando prueba de señal (RSSI)...")
+    print("-" * 40)
+    
+    # 3. Un bucle que se repetirá exactamente 10 veces
     for medicion in range(10):
+        
+        # En cada repetición, vuelve a verificar si sigue conectado
         if not sta.isconnected():
-            print("Se perdió la conexión.")
+            print("¡Se perdió la conexión en medio de la prueba!")
             break
-        print("Muestra", medicion + 1, ": RSSI =", sta.status("rssi"), "dBm")
+            
+        # 4. Obtiene los datos de la conexión actual
+        # .ifconfig() devuelve (IP, Máscara, Puerta de enlace, DNS)
+        # .status('rssi') nos da los dBm de la red a la que estamos asociados
+        rssi = sta.status('rssi')
+        
+        # 5. Muestra el número de muestra (1 al 10) y la potencia actual
+        print(f"Muestra {medicion + 1}/10 | Potencia actual: {rssi} dBm")
+        
+        # Espera 1 segundo antes de tomar la siguiente muestra
+        time.sleep(1)
+        
+    print("-" * 40)
+    print("Prueba finalizada.")
+medicion + 1, ": RSSI =", sta.status("rssi"), "dBm")
         time.sleep(1)
 </script>
 
