@@ -26,12 +26,6 @@ La [declaración de uso de IA](DECLARACION-IA.md) identifica el papel de Braian 
 
 La [guía de privacidad](PRIVACIDAD.md) explica qué se guarda en `localStorage`, el permiso Web Serial y las dependencias de CDN. **Los bloques pueden guardar claves Wi-Fi en este navegador**. Descarga el `.py` o exporta `.json` antes de usar **Ajustes → Borrar datos guardados**. El borrado recarga la página y no modifica la placa ni revoca el permiso serial del navegador. La reconexión automática está desactivada por defecto; puede activarse en Ajustes.
 
-## Publicar en GitHub Pages
-
-1. Sube el contenido de esta carpeta al directorio raíz del repositorio. El único archivo imprescindible para ejecutar la aplicación es **index.html**; publica también el README, la declaración de IA, la guía de privacidad y la licencia para ofrecer documentación visible en GitHub.
-2. En **Settings → Pages**, publica **main** y **/(root)**.
-3. Abre la URL HTTPS de Pages en **Chrome o Edge de escritorio**, conecta la placa por USB y autoriza el puerto cuando el navegador lo solicite.
-
 La interfaz se sirve como archivo estático. Las bibliotecas del editor y del flasheador se cargan desde CDN, por lo que se necesita Internet para abrirlas por primera vez. El firmware .bin se selecciona desde el disco del usuario; la aplicación no lo incluye ni lo envía a un servidor.
 
 El botón **Bloques** carga Blockly 13.3.0 desde CDN cuando se abre la vista visual. Ejecutar local carga Pyodide v314.0.7 bajo demanda desde CDN; la fuente OpenDyslexic también se descarga bajo demanda. Todo el código de la aplicación y los ejemplos siguen dentro de **index.html**; no hace falta instalar programas en la PC. El MicroPython generado se ejecuta en el ESP32 conectado mediante el mismo botón **Conectar** del IDE.
