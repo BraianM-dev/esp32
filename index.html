@@ -45,6 +45,12 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/display/placeholder.min.js"></script>
 
 <style>
+@font-face {
+  font-family: OpenDyslexic;
+  src: url('https://cdn.jsdelivr.net/gh/antijingoist/opendyslexic@main/compiled/OpenDyslexic-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-display: swap;
+}
 /* ============================================================
    THEME SYSTEM
    ============================================================ */
@@ -178,6 +184,7 @@ header.topbar::-webkit-scrollbar { display: none; }
 .brand small { color: var(--text-3); font-weight: 500; margin-left: 2px; }
 
 .topbar-actions { display: flex; gap: 8px; margin-left: 8px; flex-shrink: 0; }
+.topbar-actions:last-child { position: sticky; right: 0; z-index: 2; margin-left: auto; padding-left: 6px; background: var(--bg-1); }
 
 .btn {
   display: inline-flex;
@@ -207,16 +214,19 @@ header.topbar::-webkit-scrollbar { display: none; }
 .btn.success { background: var(--success); border-color: var(--success); color: #fff; }
 .btn.ghost   { background: transparent; border-color: transparent; color: var(--text-2); }
 .btn.ghost:hover { background: var(--bg-hover); color: var(--text); }
+.btn[aria-pressed="true"] { border-color: var(--accent); box-shadow: inset 0 -2px var(--accent); }
 
 .topbar-spacer { flex: 1; }
 
 /* MAIN WORKSPACE */
 .workspace {
   display: grid;
-  grid-template-columns: var(--sidebar-w) 1fr;
+  grid-template-columns: var(--sidebar-w) minmax(0, 1fr);
   min-height: 0;
   overflow: hidden;
 }
+.workspace.sidebar-collapsed { grid-template-columns: 0 minmax(0, 1fr); }
+.workspace.sidebar-collapsed .sidebar { visibility: hidden; border: 0; pointer-events: none; }
 
 /* SIDEBAR */
 .sidebar {
@@ -333,6 +343,17 @@ header.topbar::-webkit-scrollbar { display: none; }
   scrollbar-width: none;
 }
 .tabs-bar::-webkit-scrollbar { display: none; }
+.mode-tabs { display: flex; align-items: center; gap: 7px; min-height: 39px; padding: 3px 10px; border-bottom: 1px solid var(--border); background: var(--bg-2); flex-shrink: 0; }
+.mode-tablist { display: flex; align-self: stretch; gap: 3px; }
+.mode-spacer { flex: 1; }
+.mode-controls { display: flex; align-items: center; gap: 7px; min-width: 0; }
+.mode-controls label { font-size: 11px; color: var(--text-2); font-weight: 600; }
+.mode-controls select { width: auto; max-width: 180px; padding: 6px 8px; background: var(--bg-3); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); font: 12px var(--font-ui); }
+.mode-controls .btn { height: 30px; padding: 5px 9px; font-size: 11.5px; white-space: nowrap; }
+.mode-tab { display: inline-flex; align-items: center; gap: 7px; min-width: 104px; justify-content: center; padding: 4px 13px; border: 1px solid transparent; border-bottom: 2px solid transparent; border-radius: 6px 6px 0 0; background: transparent; color: var(--text-2); cursor: pointer; font: 600 12.5px var(--font-ui); }
+.mode-tab svg { width: 15px; height: 15px; }
+.mode-tab:hover { background: var(--bg-hover); color: var(--text); }
+.mode-tab.active { background: var(--editor-bg); color: var(--text); border-color: var(--border); border-bottom-color: var(--accent); }
 .tab {
   display: flex;
   align-items: center;
@@ -465,6 +486,9 @@ html[data-theme="light"] .cm-s-default .cm-builtin { color: #b45309; }
 }
 .term-tab:hover { background: var(--bg-hover); color: var(--text); }
 .term-tab.active { background: var(--bg-active); color: var(--text); }
+.doc-tabs { overflow-x: auto; }
+.doc-tabs .term-tab { border: 0; background: transparent; font-family: inherit; white-space: nowrap; }
+.doc-tabs .term-tab.active { background: var(--bg-active); }
 .term-header .spacer { flex: 1; }
 .term-actions { display: flex; gap: 2px; }
 .term-actions .icon-btn { width: 24px; height: 24px; color: var(--text-3); }
@@ -496,6 +520,7 @@ html[data-theme="light"] .cm-s-default .cm-builtin { color: #b45309; }
    ============================================================ */
 .statusbar {
   display: flex;
+  position: relative;
   align-items: center;
   gap: 16px;
   padding: 0 14px;
@@ -515,6 +540,11 @@ html[data-theme="light"] .cm-s-default .cm-builtin { color: #b45309; }
 @keyframes pulse { 50% { opacity: .4; } }
 .statusbar .spacer { flex: 1; }
 .statusbar .cursor-pos { font-family: var(--font-mono); font-size: 11px; color: var(--text-3); }
+.footer-credit { position: absolute; left: 50%; transform: translateX(-50%); white-space: nowrap; font-size: 10.5px; }
+.footer-code { font-family: var(--font-mono); font-weight: 800; color: var(--accent); font-size: 13px; }
+@media (max-width: 1100px) { .statusbar .cursor-pos, .baud-item, .editor-item, .version-item { display: none; } }
+@media (max-width: 760px) { .chip-item { display: none; } .statusbar { gap: 7px; padding: 0 7px; } .footer-credit { font-size: 9px; } }
+@media (max-width: 540px) { #statusText { display: none; } }
 
 /* ============================================================
    TOASTS
@@ -619,7 +649,7 @@ html[data-theme="light"] .cm-s-default .cm-builtin { color: #b45309; }
   color: var(--text-2);
   margin-bottom: 6px;
 }
-.field input[type=text], .field input[type=number], .field select {
+.field input[type=text], .field input[type=search], .field input[type=number], .field select {
   width: 100%;
   padding: 9px 12px;
   background: var(--bg-3);
@@ -649,6 +679,75 @@ html[data-theme="light"] .cm-s-default .cm-builtin { color: #b45309; }
 .example-item:hover, .example-item:focus-visible { border-color: var(--accent); background: var(--accent-soft); }
 .example-item svg { width: 18px; flex-shrink: 0; }
 .example-item small { display: block; font-size: 11.5px; color: var(--text-3); margin-top: 4px; line-height: 1.45; }
+.example-item { display: block; cursor: default; }
+.example-heading { display: flex; align-items: center; gap: 10px; }
+.example-heading svg { color: var(--accent); }
+.example-steps { margin: 10px 0 12px 28px; padding-left: 13px; color: var(--text-2); font-size: 12px; line-height: 1.55; }
+.example-actions { display: flex; flex-wrap: wrap; gap: 7px; padding-left: 28px; }
+.example-actions .btn { height: 30px; font-size: 12px; }
+.example-warning { margin: 0 0 11px 28px; padding: 8px 10px; border-left: 3px solid var(--warn); border-radius: 3px; background: rgba(245,158,11,.12); color: var(--text); font-size: 11.5px; line-height: 1.55; }
+.example-group { color: var(--accent); font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; margin: 14px 0 4px; }
+.block-connection-guide { padding: 9px 14px; background: var(--accent-soft); color: var(--text); border-bottom: 1px solid var(--border); font-size: 12px; line-height: 1.5; }
+.block-connection-guide strong { color: var(--accent); }
+.block-connection-guide { display: flex; align-items: flex-start; gap: 12px; }
+.block-connection-guide .guide-text { flex: 1; }
+.block-connection-guide .icon-btn { flex-shrink: 0; }
+#accessibilityOverlay { z-index: 800; }
+:focus-visible { outline: 3px solid var(--accent) !important; outline-offset: 2px; }
+html.a11y-contrast { --text-2: #f8fafc; --text-3: #e2e8f0; --border: #cbd5e1; --accent: #fbbf24; --accent-hover: #eab308; --accent-soft: rgba(251,191,36,.18); }
+html.a11y-contrast[data-theme="light"] { --text-2: #172033; --text-3: #253349; --border: #334155; --accent: #064cb2; --accent-hover: #073f94; --accent-soft: rgba(6,76,178,.16); }
+html.a11y-contrast .btn.primary { color: #07111f; }
+html.a11y-contrast[data-theme="light"] .btn.primary { color: white; }
+html.a11y-reduce-motion *, html.a11y-reduce-motion *::before, html.a11y-reduce-motion *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
+html.a11y-dyslexia { --font-ui: OpenDyslexic, Verdana, sans-serif; --font-mono: OpenDyslexic, Verdana, sans-serif; }
+html.a11y-dyslexia body, html.a11y-dyslexia button, html.a11y-dyslexia input, html.a11y-dyslexia select, html.a11y-dyslexia textarea,
+html.a11y-dyslexia .CodeMirror, html.a11y-dyslexia .CodeMirror pre, html.a11y-dyslexia .blocklyText { font-family: var(--font-ui) !important; letter-spacing: .025em; line-height: 1.65; }
+html.a11y-large body { font-size: calc(14px * var(--a11y-scale)); }
+html.a11y-large .btn, html.a11y-large .field, html.a11y-large .notice-box, html.a11y-large .example-item, html.a11y-large .blocks-help, html.a11y-large .block-connection-guide, html.a11y-large .sidebar, html.a11y-large .modal { font-size: calc(13px * var(--a11y-scale)); }
+html.a11y-large .CodeMirror, html.a11y-large #blocklyCode { font-size: calc(13.5px * var(--a11y-scale)) !important; }
+html.a11y-large .modal { max-height: 90vh; overflow: auto; }
+
+/* El espacio y los menús de Blockly usan los mismos colores que el IDE. */
+html[data-theme="dark"] { --blocks-canvas: #0d1522; --blocks-toolbox: #172033; --blocks-flyout: #202b40; --blocks-ink: #eef4ff; }
+html[data-theme="light"] { --blocks-canvas: #f7f9fd; --blocks-toolbox: #e8edf5; --blocks-flyout: #f1f5fa; --blocks-ink: #172033; }
+.blocks-view { flex: 1; display: flex; flex-direction: column; min-height: 0; min-width: 0; overflow: hidden; background: var(--editor-bg); }
+.blocks-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; padding: 6px 9px; border-bottom: 1px solid var(--border); background: var(--bg-2); }
+.blocks-toolbar .btn { height: 30px; padding: 5px 9px; font-size: 11.5px; }
+.blocks-toolbar label { font-size: 12px; color: var(--text-2); font-weight: 600; }
+.blocks-toolbar select { width: auto; min-width: 175px; max-width: 265px; padding: 7px 9px; background: var(--bg-3); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); font: inherit; }
+.blocks-toolbar .toolbar-spacer { flex: 1; }
+.blocks-layout { display: grid; grid-template-columns: minmax(0, 3fr) minmax(240px, 1.2fr); min-height: 100px; flex: 1; }
+#blocklyWorkspace { position: relative; min-height: 0; background: var(--blocks-canvas); }
+.blocks-preview { display: flex; flex-direction: column; min-width: 0; min-height: 0; border-left: 1px solid var(--border); background: var(--editor-bg); }
+.blocks-preview-title { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; font-weight: 600; padding: 10px 14px; color: var(--text-2); border-bottom: 1px solid var(--border); }
+.blocks-preview-title strong { color: var(--accent); font-weight: 600; }
+#blocklyCode { flex: 1; overflow: auto; white-space: pre; padding: 14px; color: var(--text); font: 12.5px/1.55 var(--font-mono); tab-size: 4; }
+#blocklyMessage { min-height: 29px; padding: 7px 14px; color: var(--text-2); font-size: 11.5px; border-top: 1px solid var(--border); background: var(--bg-2); }
+#blocklyMessage[data-level="warn"] { color: var(--warn); }
+#blocklyMessage[data-level="error"] { color: var(--danger); }
+.blocks-help { background: var(--bg-2); border-bottom: 1px solid var(--border); padding: 0 14px; color: var(--text-2); font-size: 12px; }
+.blocks-help summary { cursor: pointer; padding: 7px 0; color: var(--accent); font-weight: 600; }
+.blocks-help p { padding: 4px 0 10px; line-height: 1.55; }
+#blockProbeResult { max-height: 90px; overflow: auto; white-space: pre-wrap; padding: 8px 14px; font: 11.5px/1.4 var(--font-mono); background: var(--bg-3); border-bottom: 1px solid var(--border); color: var(--text); }
+.blocks-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 6px 10px; border-top: 1px solid var(--border); background: var(--bg-2); }
+.blocks-actions .spacer { flex: 1; }
+.blocks-actions .btn { height: 30px; font-size: 11.5px; }
+html[data-theme="dark"] #blocklyWorkspace .blocklyToolboxDiv { background: var(--blocks-toolbox) !important; border-right: 1px solid #334155; }
+html[data-theme="dark"] #blocklyWorkspace .blocklyFlyoutBackground { fill: var(--blocks-flyout) !important; }
+html[data-theme="dark"] #blocklyWorkspace .blocklyTreeLabel,
+html[data-theme="dark"] #blocklyWorkspace .blocklyToolboxCategoryLabel,
+html[data-theme="dark"] #blocklyWorkspace .blocklyFlyoutLabelText { color: var(--blocks-ink) !important; fill: var(--blocks-ink) !important; }
+html[data-theme="dark"] #blocklyWorkspace .blocklyMainBackground { stroke: #334155 !important; }
+html[data-theme="dark"] .blocklyWidgetDiv,
+html[data-theme="dark"] .blocklyDropDownDiv { background: #253349; color: #eef4ff; border-color: #52627b; }
+html[data-theme="dark"] .blocklyWidgetDiv input { background: #111c2e; color: #fff; border: 1px solid #64748b; }
+@media (max-width: 760px) {
+  .blocks-layout { grid-template-columns: 1fr; grid-template-rows: minmax(260px, 2fr) minmax(130px, 1fr); }
+  .blocks-preview { border-left: 0; border-top: 1px solid var(--border); }
+  .blocks-toolbar { max-height: 82px; overflow: auto; }
+  .blocks-actions { padding: 4px 7px; gap: 4px; }
+  .blocks-actions .btn { padding: 4px 6px; }
+}
 
 /* Command palette */
 .cmd-list { max-height: 50vh; overflow-y: auto; padding: 6px; }
@@ -754,10 +853,16 @@ html[data-theme="light"] .cm-s-default .cm-builtin { color: #b45309; }
   .term-panel { height: 220px; }
   .topbar-actions .btn span { display: none; }
   .topbar-actions .btn { padding: 0; width: 34px; justify-content: center; }
+  .mode-controls label { display: none; }
+  .mode-controls select { max-width: 145px; }
 }
 @media (max-width: 640px) {
-  .workspace { grid-template-columns: 1fr; }
+  .workspace { grid-template-columns: minmax(0, 1fr); }
   .sidebar { display: none; }
+  #btnSidebarToggle { display: none; }
+  .mode-tab { min-width: 72px; padding: 4px 7px; }
+  .mode-controls select { max-width: 105px; }
+  .mode-controls .btn span { display: none; }
   header.topbar { gap: 6px; padding: 0 8px; }
   .brand { font-size: 0; gap: 0; flex-shrink: 0; }
   .brand small { display: none; }
@@ -778,28 +883,26 @@ html[data-theme="light"] .cm-s-default .cm-builtin { color: #b45309; }
 
     <div class="topbar-actions">
       <button class="btn primary" id="btnConnect" title="Conectar placa (Ctrl+K)">
-        <i data-lucide="plug"></i><span>Conectar</span>
+        <i data-lucide="plug"></i><span data-i18n="connect">Conectar</span>
       </button>
-      <button class="btn" id="btnRun" disabled title="Ejecutar en RAM (F5)">
-        <i data-lucide="play"></i><span>Ejecutar</span>
+      <button class="btn" id="btnRun" title="Ejecutar en placa o, si está desconectada, Python local (F5)">
+        <i data-lucide="play"></i><span data-i18n="run">Ejecutar</span>
       </button>
+      <button class="btn" id="btnRunLocal" title="Ejecutar Python puro en este navegador, sin placa"><i data-lucide="laptop"></i><span data-i18n="runLocal">Ejecutar local</span></button>
       <button class="btn" id="btnSave" disabled title="Guardar en la placa (Ctrl+S)">
-        <i data-lucide="save"></i><span>Guardar</span>
+        <i data-lucide="save"></i><span data-i18n="save">Guardar</span>
       </button>
       <button class="btn" id="btnSaveAs" disabled title="Guardar como… (Ctrl+Shift+S)">
         <i data-lucide="save-all"></i>
       </button>
       <button class="btn" id="btnInterrupt" disabled title="Interrumpir ejecución (Ctrl+C)">
-        <i data-lucide="square"></i><span>Detener</span>
+        <i data-lucide="square"></i><span data-i18n="stop">Detener</span>
       </button>
       <button class="btn" id="btnReset" disabled title="Reiniciar placa (Ctrl+R)">
         <i data-lucide="rotate-ccw"></i><span>Reset</span>
       </button>
       <button class="btn" id="btnFirmware" title="Instalar MicroPython desde el navegador" aria-label="Instalar MicroPython">
-        <i data-lucide="cpu"></i><span>Firmware</span>
-      </button>
-      <button class="btn" id="btnExamples" title="Ejemplos MicroPython para ESP32" aria-label="Abrir ejemplos MicroPython">
-        <i data-lucide="book-open"></i><span>Ejemplos</span>
+        <i data-lucide="cpu"></i><span data-i18n="firmware">Firmware</span>
       </button>
     </div>
 
@@ -809,6 +912,7 @@ html[data-theme="light"] .cm-s-default .cm-builtin { color: #b45309; }
       <button class="btn icon-only ghost" id="btnCommand" title="Paleta de comandos (Ctrl+Shift+P)">
         <i data-lucide="command"></i>
       </button>
+      <button class="btn icon-only ghost" id="btnAccessibility" aria-label="Abrir accesibilidad" aria-controls="accessibilityOverlay" title="Accesibilidad (Alt+A)"><i data-lucide="accessibility"></i></button>
       <button class="btn icon-only ghost" id="btnTheme" title="Cambiar tema">
         <i data-lucide="moon"></i>
       </button>
@@ -819,10 +923,10 @@ html[data-theme="light"] .cm-s-default .cm-builtin { color: #b45309; }
   </header>
 
   <!-- ======================= WORKSPACE ======================= -->
-  <div class="workspace">
+  <div class="workspace" id="workspace">
 
     <!-- SIDEBAR -->
-    <aside class="sidebar">
+    <aside class="sidebar" id="sidebar">
       <div class="sidebar-section">
         <span>Explorador</span>
         <div class="toolbar">
@@ -850,10 +954,61 @@ html[data-theme="light"] .cm-s-default .cm-builtin { color: #b45309; }
       <!-- TABS -->
       <div class="tabs-bar" id="tabsBar"></div>
 
+      <div class="mode-tabs">
+        <button class="btn icon-only ghost" type="button" id="btnSidebarToggle" title="Ocultar explorador" aria-label="Ocultar explorador" aria-controls="sidebar" aria-expanded="true"><i data-lucide="panel-left-close"></i></button>
+        <div class="mode-tablist" role="tablist" aria-label="Vista del proyecto">
+          <button class="mode-tab active" type="button" id="btnCode" role="tab" aria-selected="true" aria-controls="codeView"><i data-lucide="code-2"></i><span data-i18n="code">Código</span></button>
+          <button class="mode-tab" type="button" id="btnBlocks" role="tab" aria-selected="false" aria-controls="blocksView"><i data-lucide="blocks"></i><span data-i18n="blocks">Bloques</span></button>
+        </div>
+        <span class="mode-spacer"></span>
+        <div class="mode-controls">
+          <label for="blockBoard" data-i18n="boardProfile">Perfil:</label>
+          <select id="blockBoard" title="El perfil comprueba pines reservados y recursos de la placa">
+            <option value="c3">ESP32-C3 Super Mini</option>
+            <option value="generic">ESP32 / otro modelo</option>
+          </select>
+          <button class="btn" type="button" id="btnExamples" title="Ejemplos MicroPython para ESP32" aria-label="Abrir ejemplos MicroPython"><i data-lucide="book-open"></i><span data-i18n="viewExamples">Ver ejemplos</span></button>
+          <button class="btn" type="button" id="btnDownloadCode" title="Descargar el programa actual como archivo .py" aria-label="Descargar programa Python"><i data-lucide="download"></i><span data-i18n="downloadPy">Descargar .py</span></button>
+        </div>
+      </div>
+
       <!-- EDITOR -->
-      <div class="editor-wrap">
+      <div class="editor-wrap" id="codeView" role="tabpanel" aria-labelledby="btnCode">
         <textarea id="editor-host"></textarea>
       </div>
+
+      <section class="blocks-view hidden" id="blocksView" role="tabpanel" aria-labelledby="btnBlocks">
+    <div class="blocks-toolbar">
+      <button class="btn" id="btnEditRaw" disabled title="Editar el bloque Python seleccionado"><i data-lucide="square-pen"></i> Python</button>
+      <button class="btn" id="btnGuideToggle" type="button" aria-controls="blockConnectionGuide" aria-expanded="true"><i data-lucide="circle-help"></i> <span data-i18n="blocksHelp">Ayuda de bloques</span></button>
+      <span class="toolbar-spacer"></span>
+      <button class="btn" id="btnBlockProbe" title="Consultar módulos presentes en el firmware MicroPython conectado">Verificar placa</button>
+      <button class="btn" id="btnBlockImport" title="Cargar un proyecto de bloques en JSON">Importar .json</button>
+      <button class="btn" id="btnBlockExport" title="Guardar un proyecto de bloques editable">Exportar .json</button>
+      <button class="btn" id="btnBlockClear">Limpiar</button>
+      <input id="blockProjectFile" type="file" accept=".json,application/json" class="hidden">
+    </div>
+    <details class="blocks-help" id="blockPinHelp">
+      <summary>Guía rápida: GPIO, radios y USB de la ESP32-C3</summary>
+      <p>GPIO2, 8 y 9 intervienen en el arranque (GPIO8 puede controlar el LED integrado según la placa). GPIO12–17 suelen estar conectados a la flash y GPIO18/19 al USB Serial/JTAG: el perfil C3 impide usarlos como pines de proyectos. ADC: GPIO0–4. Bluetooth en C3 es BLE. ESP-NOW requiere el módulo del firmware y ambos equipos en el mismo canal Wi-Fi. El USB integrado sirve para el REPL y la salida de <code>print()</code>; no equivale a un puerto USB de propósito general.</p>
+    </details>
+    <div class="block-connection-guide" id="blockConnectionGuide" role="note"><div class="guide-text" id="blockGuideText">¿Cómo se conectan? Arrastra bloques desde las categorías. Encaja muescas para ordenar instrucciones. Coloca bloques redondos en huecos de la misma forma. Los bloques «hacer» contienen otras instrucciones. Toca un bloque para ver su ayuda; clic derecho permite comentar o duplicar.</div><button class="icon-btn" id="btnCloseBlockGuide" type="button" title="Cerrar ayuda" aria-label="Cerrar ayuda de bloques"><i data-lucide="x"></i></button></div>
+    <div id="blockProbeResult" class="hidden" role="status"></div>
+    <div class="blocks-layout">
+      <div id="blocklyWorkspace" aria-label="Área de programación por bloques"></div>
+      <div class="blocks-preview">
+        <div class="blocks-preview-title">MicroPython generado · ESP32 <strong id="blockCodeSize">0 líneas</strong></div>
+        <pre id="blocklyCode">Abre Bloques para cargar el editor visual.</pre>
+      </div>
+    </div>
+    <div id="blocklyMessage" role="status">Los proyectos se guardan en este navegador; las claves Wi-Fi también. Exporta JSON para moverlos a otra PC.</div>
+    <div class="blocks-actions">
+      <button class="btn" id="btnBlockToEditor"><i data-lucide="code-2"></i> <span data-i18n="viewCode">Ver Código del mismo proyecto</span></button>
+      <div class="spacer"></div>
+      <button class="btn" id="btnBlockSave">Guardar .py en la placa</button>
+      <button class="btn primary" id="btnBlockRun" title="Ejecutar en la placa o, si está desconectada, Python local"><i data-lucide="play"></i> Ejecutar programa</button>
+    </div>
+      </section>
 
       <!-- TERMINAL -->
       <div class="term-resizer" id="termResizer"></div>
@@ -887,24 +1042,39 @@ html[data-theme="light"] .cm-s-default .cm-builtin { color: #b45309; }
       <span class="status-dot" id="statusDot"></span>
       <span id="statusText">Desconectado</span>
     </div>
-    <div class="status-item">
+    <div class="status-item chip-item">
       <i data-lucide="microchip"></i>
       <span id="chipText">ESP32</span>
     </div>
-    <div class="status-item">
+    <div class="status-item baud-item">
       <i data-lucide="usb"></i>
       <span id="baudText">115200 baud</span>
     </div>
     <div class="spacer"></div>
     <div class="status-item cursor-pos" id="cursorPos">Ln 1, Col 1</div>
-    <div class="status-item">
+    <div class="status-item editor-item">
       <span id="editorMode">Python</span>
     </div>
-    <div class="status-item">
+    <div class="status-item version-item">
       <i data-lucide="info"></i>
-      <span id="versionText">v2.0.0</span>
+      <span id="versionText">v3.4.0</span>
     </div>
+    <div class="status-item footer-credit" aria-label="Diseñado y Desarrollado por Braian M. | 2026"><span class="footer-code" aria-hidden="true">&lt;/&gt;</span><span>Diseñado y Desarrollado por Braian M. | 2026</span></div>
   </footer>
+</div>
+
+<div class="overlay hidden" id="accessibilityOverlay" role="dialog" aria-modal="true" aria-labelledby="a11yTitle">
+  <div class="modal" style="width:min(460px,94vw)">
+    <div class="modal-header"><div class="title" id="a11yTitle"><i data-lucide="accessibility"></i> <span data-i18n="accessibility">Accesibilidad</span></div><button class="icon-btn" data-close="accessibilityOverlay" aria-label="Cerrar"><i data-lucide="x"></i></button></div>
+    <div class="modal-body">
+      <div class="field"><label for="a11yScale"><span data-i18n="interfaceSize">Tamaño de interfaz</span>: <output id="a11yScaleValue">100 %</output></label><input id="a11yScale" type="range" min="100" max="150" step="10" value="100"></div>
+      <div class="field"><label><input id="a11yContrast" type="checkbox"> <span data-i18n="highContrast">Contraste alto</span></label></div>
+      <div class="field"><label><input id="a11yMotion" type="checkbox"> <span data-i18n="reduceMotion">Reducir animaciones</span></label></div>
+      <div class="field"><label><input id="a11yDyslexia" type="checkbox"> <span data-i18n="dyslexiaFont">Tipografía para dislexia</span></label><p class="hint" data-i18n="dyslexiaHint">Usa OpenDyslexic en la interfaz, el código y los bloques; puedes desactivarla cuando quieras.</p></div>
+      <p class="hint" data-i18n="a11yHint">La navegación por teclado muestra el foco. Pulsa Alt+A para abrir este menú y Esc para cerrarlo.</p>
+    </div>
+    <div class="modal-footer"><button class="btn primary" data-close="accessibilityOverlay" data-i18n="done">Listo</button></div>
+  </div>
 </div>
 
 <!-- ======================= TOASTS ======================= -->
@@ -925,30 +1095,31 @@ html[data-theme="light"] .cm-s-default .cm-builtin { color: #b45309; }
 <div class="overlay hidden" id="settingsOverlay">
   <div class="modal">
     <div class="modal-header">
-      <div class="title"><i data-lucide="settings"></i> Ajustes</div>
+      <div class="title"><i data-lucide="settings"></i> <span data-i18n="settings">Ajustes</span></div>
       <button class="icon-btn" data-close="settingsOverlay"><i data-lucide="x"></i></button>
     </div>
     <div class="modal-body">
       <div class="settings-section">
-        <div class="settings-title">Apariencia</div>
+        <div class="settings-title" data-i18n="appearance">Apariencia</div>
+        <div class="field"><label for="setLanguage" data-i18n="language">Idioma de la interfaz</label><select id="setLanguage"><option value="es">Español</option><option value="en">English</option></select></div>
         <div class="field">
-          <label>Tema</label>
+          <label data-i18n="theme">Tema</label>
           <select id="setTheme">
             <option value="dark">Oscuro</option>
             <option value="light">Claro</option>
           </select>
         </div>
         <div class="field">
-          <label>Tamaño de fuente del editor</label>
+          <label data-i18n="editorFont">Tamaño de fuente del editor</label>
           <input type="number" id="setFontSize" min="10" max="24" step="1">
         </div>
         <div class="field">
-          <label>Tamaño de pestaña</label>
+          <label data-i18n="tabSize">Tamaño de pestaña</label>
           <input type="number" id="setTabSize" min="2" max="8" step="1">
         </div>
       </div>
       <div class="settings-section">
-        <div class="settings-title">Conexión</div>
+        <div class="settings-title" data-i18n="connection">Conexión</div>
         <div class="field">
           <label>Velocidad (baudios)</label>
           <select id="setBaud">
@@ -966,7 +1137,7 @@ html[data-theme="light"] .cm-s-default .cm-builtin { color: #b45309; }
         </div>
       </div>
       <div class="settings-section">
-        <div class="settings-title">Editor</div>
+        <div class="settings-title" data-i18n="editor">Editor</div>
         <div class="field">
           <label><input type="checkbox" id="setAutocomplete"> Autocompletado</label>
         </div>
@@ -977,10 +1148,16 @@ html[data-theme="light"] .cm-s-default .cm-builtin { color: #b45309; }
           <label><input type="checkbox" id="setWordWrap"> Ajuste de línea</label>
         </div>
       </div>
+      <div class="settings-section">
+        <div class="settings-title" data-i18n="dataPrivacy">Datos y privacidad</div>
+        <p class="hint" data-i18n="dataHint">Los bloques y sus claves Wi-Fi se guardan en este navegador. Descarga el .py o exporta el JSON antes de borrar datos.</p>
+        <div class="field"><button class="btn" type="button" id="btnPrivacyInfo" data-i18n="viewPrivacy">Ver privacidad</button></div>
+        <div class="field"><button class="btn danger" type="button" id="btnClearLocalData" data-i18n="clearLocalData">Borrar datos guardados</button></div>
+      </div>
     </div>
     <div class="modal-footer">
-      <button class="btn" data-close="settingsOverlay">Cancelar</button>
-      <button class="btn primary" id="btnSaveSettings">Guardar</button>
+      <button class="btn" data-close="settingsOverlay" data-i18n="cancel">Cancelar</button>
+      <button class="btn primary" id="btnSaveSettings" data-i18n="save">Guardar</button>
     </div>
   </div>
 </div>
@@ -1070,30 +1247,41 @@ html[data-theme="light"] .cm-s-default .cm-builtin { color: #b45309; }
 <div class="overlay hidden" id="examplesOverlay" role="dialog" aria-modal="true" aria-labelledby="examplesTitle">
   <div class="modal" style="width:min(620px,94vw)">
     <div class="modal-header">
-      <div class="title" id="examplesTitle"><i data-lucide="book-open"></i> Ejemplos ESP32 / MicroPython</div>
+      <div class="title" id="examplesTitle"><i data-lucide="book-open"></i> <span data-i18n="examplesTitle">Ejemplos ESP32 / MicroPython</span></div>
       <button class="icon-btn" data-close="examplesOverlay" title="Cerrar"><i data-lucide="x"></i></button>
     </div>
     <div class="modal-body">
-      <div class="notice-box">Cada ejemplo se abre en una pestaña local editable. Puedes ejecutarlo con F5 o guardarlo en la placa con Ctrl+S. Cambia los marcadores de SSID y clave antes de conectar a una red.</div>
+      <div class="notice-box" id="examplesIntro" data-i18n="examplesIntro">Cada ejemplo se abre en la vista actual, Código o Bloques. Cambia SSID y clave antes de conectar Wi-Fi. Para Python sin hardware, usa Ejecutar local sin placa.</div>
+      <div class="field"><label for="exampleSearch" data-i18n="searchExamples">Buscar ejemplos</label><input id="exampleSearch" type="search" placeholder="Wi-Fi, LED, BLE, ESP-NOW…"></div>
       <div class="examples-list" id="examplesList"></div>
     </div>
-    <div class="modal-footer"><button class="btn" data-close="examplesOverlay">Cerrar</button></div>
+    <div class="modal-footer"><button class="btn" data-close="examplesOverlay" data-i18n="close">Cerrar</button></div>
   </div>
 </div>
 
-<div class="overlay hidden" id="docsOverlay">
+<div class="overlay hidden" id="rawEditorOverlay" role="dialog" aria-modal="true" aria-labelledby="rawEditorTitle">
+  <div class="modal" style="width:min(720px,94vw)">
+    <div class="modal-header"><div class="title" id="rawEditorTitle">Editar bloque Python</div><button class="icon-btn" data-close="rawEditorOverlay" aria-label="Cerrar"><i data-lucide="x"></i></button></div>
+    <div class="modal-body"><p class="notice-box">Este bloque mantiene intacto el Python que no puede representarse con las piezas disponibles. Sus líneas se ejecutan en la ESP32.</p><textarea id="rawEditorText" spellcheck="false" style="width:100%;height:45vh;padding:12px;background:var(--editor-bg);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font:13px/1.5 var(--font-mono)"></textarea></div>
+    <div class="modal-footer"><button class="btn" data-close="rawEditorOverlay">Cancelar</button><button class="btn primary" id="btnRawApply">Aplicar al bloque</button></div>
+  </div>
+</div>
+
+<div class="overlay hidden" id="docsOverlay" role="dialog" aria-modal="true" aria-labelledby="docsTitle">
   <div class="modal" style="width:min(720px,94vw)">
     <div class="modal-header">
-      <div class="title"><i data-lucide="book-open"></i> Documentación</div>
+      <div class="title" id="docsTitle"><i data-lucide="book-open"></i> Documentación</div>
       <button class="icon-btn" data-close="docsOverlay"><i data-lucide="x"></i></button>
     </div>
     <div class="modal-body" style="padding:0;">
-      <div class="term-tabs" style="display:flex; gap:2px; padding:10px 14px 0; border-bottom:1px solid var(--border);">
-        <div class="term-tab active" data-doc="readme">README</div>
-        <div class="term-tab" data-doc="license">Licencia MIT</div>
-        <div class="term-tab" data-doc="about">Acerca de</div>
+      <div class="term-tabs doc-tabs" role="tablist" aria-label="Documentos del proyecto" style="display:flex; gap:2px; padding:10px 14px 0; border-bottom:1px solid var(--border);">
+        <button type="button" role="tab" id="docTabReadme" class="term-tab active" aria-selected="true" aria-controls="docPane" data-doc="readme">README</button>
+        <button type="button" role="tab" id="docTabLicense" class="term-tab" aria-selected="false" aria-controls="docPane" data-doc="license" data-i18n="docsLicense">Licencia MIT</button>
+        <button type="button" role="tab" id="docTabAbout" class="term-tab" aria-selected="false" aria-controls="docPane" data-doc="about" data-i18n="docsAbout">Acerca de</button>
+        <button type="button" role="tab" id="docTabAi" class="term-tab" aria-selected="false" aria-controls="docPane" data-doc="ai" data-i18n="docsAi">Uso de IA</button>
+        <button type="button" role="tab" id="docTabPrivacy" class="term-tab" aria-selected="false" aria-controls="docPane" data-doc="privacy" data-i18n="docsPrivacy">Privacidad</button>
       </div>
-      <div id="docPane" style="padding:16px 18px; max-height:56vh; overflow-y:auto; font-size:13px; line-height:1.65;"></div>
+      <div id="docPane" role="tabpanel" aria-labelledby="docTabReadme" tabindex="0" style="padding:16px 18px; max-height:56vh; overflow-y:auto; font-size:13px; line-height:1.65;"></div>
     </div>
     <div class="modal-footer">
       <button class="btn primary" data-close="docsOverlay">Cerrar</button>
@@ -1107,14 +1295,20 @@ html[data-theme="light"] .cm-s-default .cm-builtin { color: #b45309; }
 <!-- ======================= FILE INPUT (hidden) ======================= -->
 <input type="file" id="fileInput" class="hidden" accept=".py,.txt,.json,.csv,.html,.css,.js,.md,.xml">
 
-<!-- Los ejemplos viven en el mismo HTML: no se ejecutan en el navegador. -->
+<!-- Los ejemplos viven en el mismo HTML; Python puro puede ejecutarse localmente con Pyodide. -->
+<script type="text/x-micropython" id="example-hello">
+# Primer programa: este Python no usa hardware, por lo que funciona sin ESP32.
+# Pulsa Ejecutar local y mira la pestaña Salida.
+print("Hola mundo")
+</script>
+
 <script type="text/x-micropython" id="example-ap">
 import network
 
 # Cambia el nombre y la clave (8 caracteres como minimo).
 ap = network.WLAN(network.WLAN.IF_AP)
-ap.config(ssid="ESP32-C3-Aula", key="CambiaEstaClave123")
 ap.active(True)
+ap.config(ssid="ESP32-C3-Aula", key="CambiaEstaClave123")
 print("Punto de acceso:", ap.config("ssid"))
 print("Dirección IP:", ap.ifconfig()[0])
 # Este ejemplo deja el AP activo hasta reiniciar o desactivarlo.
@@ -1124,16 +1318,19 @@ print("Dirección IP:", ap.ifconfig()[0])
 import network
 import time
 
+# Sustituye por el SSID y la clave de tu red de 2,4 GHz.
 SSID = "TU_RED_WIFI"
 CLAVE = "TU_CLAVE"
 sta = network.WLAN(network.WLAN.IF_STA)
 sta.active(True)
 if not sta.isconnected():
     sta.connect(SSID, CLAVE)
+    # ticks_diff gestiona el desbordamiento del contador de milisegundos.
     inicio = time.ticks_ms()
     while not sta.isconnected() and time.ticks_diff(time.ticks_ms(), inicio) < 15000:
         time.sleep_ms(250)
 if sta.isconnected():
+    # RSSI solo se consulta tras establecer la conexión Wi-Fi.
     print("Conectado. IP:", sta.ifconfig()[0])
     print("RSSI:", sta.status("rssi"), "dBm")
 else:
@@ -1144,10 +1341,12 @@ else:
 <script type="text/x-micropython" id="example-scan">
 import network
 
+# Para escanear, la interfaz de estación debe estar activa.
 sta = network.WLAN(network.WLAN.IF_STA)
 sta.active(True)
 print("Explorando redes Wi-Fi cercanas...")
 for ssid, bssid, canal, rssi, seguridad, oculta in sta.scan():
+    # scan() devuelve SSID como bytes; puede estar vacío si la red se oculta.
     nombre = ssid.decode("utf-8") if ssid else "(oculta)"
     print("SSID:", nombre, "| Canal:", canal, "| RSSI:", rssi, "dBm")
 # El RSSI se mide en la placa, no en el navegador.
@@ -1157,38 +1356,35 @@ for ssid, bssid, canal, rssi, seguridad, oculta in sta.scan():
 import network
 import time
 
-# 1. Creamos el objeto Wi-Fi en modo Estación (STA_IF)
-sta = network.WLAN(network.STA_IF)
-
-# 2. Verificamos si el ESP32 YA está conectado a internet/router
+# Cambia estos datos por una red de 2,4 GHz. La placa se conecta por sí misma.
+SSID = "TU_RED_WIFI"
+CLAVE = "TU_CLAVE"
+sta = network.WLAN(network.WLAN.IF_STA)
+sta.active(True)
 if not sta.isconnected():
-    print("Error: El ESP32 no está conectado a ninguna red Wi-Fi.")
-    print("Primero debes conectarlo a tu router usando wifi.connect('Tu_SSID', 'Tu_Clave')")
+    sta.connect(SSID, CLAVE)
+    # Espera un máximo de 15 s; no lee RSSI hasta que haya conexión.
+    inicio = time.ticks_ms()
+    while not sta.isconnected() and time.ticks_diff(time.ticks_ms(), inicio) < 15000:
+        time.sleep_ms(250)
+
+if not sta.isconnected():
+    print("No se pudo conectar. Estado:", sta.status())
+    sta.disconnect()
 else:
-    print("Conectado con éxito. Iniciando prueba de señal (RSSI)...")
-    print("-" * 40)
-    
-    # 3. Un bucle que se repetirá exactamente 10 veces
+    print("IP:", sta.ifconfig()[0])
     for medicion in range(10):
-        
-        # En cada repetición, vuelve a verificar si sigue conectado
+        # La señal se expresa en dBm; un valor menos negativo suele ser mejor.
         if not sta.isconnected():
-            print("¡Se perdió la conexión en medio de la prueba!")
+            print("Se perdió la conexión Wi-Fi.")
             break
-            
-        # 4. Obtiene los datos de la conexión actual
-        # .ifconfig() devuelve (IP, Máscara, Puerta de enlace, DNS)
-        # .status('rssi') nos da los dBm de la red a la que estamos asociados
-        rssi = sta.status('rssi')
-        
-        # 5. Muestra el número de muestra (1 al 10) y la potencia actual
-        print(f"Muestra {medicion + 1}/10 | Potencia actual: {rssi} dBm")
-        
-        # Espera 1 segundo antes de tomar la siguiente muestra
-        time.sleep(1)
-        
-    print("-" * 40)
-    print("Prueba finalizada.")
+        try:
+            print("Muestra", medicion + 1, "/10 | RSSI:", sta.status("rssi"), "dBm")
+        except OSError as error:
+            print("No se pudo medir RSSI:", error)
+            break
+        if medicion < 9:
+            time.sleep(1)
 </script>
 
 <script type="text/x-micropython" id="example-diag">
@@ -1199,6 +1395,7 @@ import network
 
 print("Placa:", os.uname().machine)
 print("Firmware:", os.uname().version)
+# Recoge objetos sin uso antes de medir la memoria disponible.
 gc.collect()
 print("RAM libre:", gc.mem_free(), "bytes")
 print("CPU:", machine.freq(), "Hz")
@@ -1217,6 +1414,7 @@ import time
 # Comprueba el pin y la polaridad de tu modelo antes de ejecutarlo.
 led = Pin(8, Pin.OUT, value=1)
 for i in range(5):
+    # En LED activo en bajo: 0 enciende, 1 apaga.
     led.value(0)
     time.sleep_ms(400)
     led.value(1)
@@ -1234,15 +1432,125 @@ import time
 uart = UART(1, baudrate=115200, tx=Pin(4), rx=Pin(5))
 uart.write("PING\n")
 for i in range(20):
+    # Solo lee si hay bytes; 20 x 250 ms dan hasta cinco segundos.
     if uart.any():
         print("Recibido:", uart.readline())
     time.sleep_ms(250)
 uart.deinit()
 </script>
 
+<script type="text/x-micropython" id="example-portal">
+# Demostración de portal cautivo local; red propia y participantes informados.
+# No suplanta servicios, no pide contraseñas ni almacena datos de visitantes.
+# Inspirado en el flujo AP → DNS → HTTP del recurso educativo de Braian Mosqueira:
+# https://github.com/BraianM-dev/portal-cautivo (CC BY 4.0). Adaptación segura.
+import network
+import socket
+import select
+import time
+
+# Cambia SSID/CLAVE si lo usas en un taller autorizado. La clave tiene al menos 8 caracteres.
+SSID = "EspWebStudio_Demo"
+CLAVE = "DemoSegura123"
+ap = network.WLAN(network.WLAN.IF_AP)
+ap.active(True)
+try:
+    ap.config(ssid=SSID, key=CLAVE)
+    ip = ap.ifconfig()[0]
+    # El DHCP entrega la propia IP como DNS; todo permanece en esta red de prueba.
+    ap.ifconfig((ip, "255.255.255.0", ip, ip))
+except Exception:
+    ap.active(False)
+    raise
+
+pagina = ("<!doctype html><html lang='es'><meta charset='utf-8'>"
+          "<meta name='viewport' content='width=device-width,initial-scale=1'>"
+          "<title>Portal educativo</title><style>body{font:18px sans-serif;"
+          "max-width:560px;margin:12vh auto;padding:20px;background:#f1f5f9;"
+          "color:#172033}main{padding:28px;background:white;border-radius:14px}</style>"
+          "<main><h1>Red de demostración</h1><p>Portal local educativo del ESP32. "
+          "No hay conexión a Internet ni formularios de acceso.</p>"
+          "<p>No introduzcas credenciales. Solo se cuentan visitas durante 45 s.</p>"
+          "<p>Visita <strong>http://" + ip + "</strong> si no se abre automáticamente.</p>"
+          "</main></html>").encode("utf-8")
+dns = None
+web = None
+visitas = 0
+try:
+    # DNS responde A con la IP del AP a sus clientes; AAAA recibe respuesta vacía.
+    dns = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    dns.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    dns.bind(("0.0.0.0", 53))
+    web = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    web.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    web.bind(("0.0.0.0", 80))
+    web.listen(2)
+    sondeo = select.poll()
+    sondeo.register(dns, select.POLLIN)
+    sondeo.register(web, select.POLLIN)
+    print("Red:", SSID, "| Página: http://" + ip, "| hasta 45 s")
+    fin = time.ticks_add(time.ticks_ms(), 45000)
+    while time.ticks_diff(fin, time.ticks_ms()) > 0 and visitas < 20:
+        for canal, evento in sondeo.poll(250):
+            if canal == dns:
+                consulta, cliente = dns.recvfrom(512)
+                if len(consulta) < 17:
+                    continue
+                pos = 12
+                while pos < len(consulta) and consulta[pos] and consulta[pos] < 64:
+                    pos += consulta[pos] + 1
+                if pos + 5 > len(consulta) or consulta[pos] != 0:
+                    continue
+                tipo = (consulta[pos + 1] << 8) | consulta[pos + 2]
+                pregunta = consulta[12:pos + 5]
+                respuesta = (consulta[:2] + b"\x81\x80\x00\x01" +
+                             (b"\x00\x01" if tipo == 1 else b"\x00\x00") +
+                             b"\x00\x00\x00\x00" + pregunta)
+                if tipo == 1:
+                    respuesta += (b"\xc0\x0c\x00\x01\x00\x01\x00\x00\x00\x1e\x00\x04" +
+                                  bytes([int(octeto) for octeto in ip.split(".")]))
+                dns.sendto(respuesta, cliente)
+            elif canal == web:
+                conexion, cliente = web.accept()
+                try:
+                    conexion.settimeout(2)
+                    if conexion.recv(512):
+                        cabecera = (b"HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\n"
+                                    b"Cache-Control: no-store\r\nConnection: close\r\nContent-Length: " +
+                                    str(len(pagina)).encode() + b"\r\n\r\n")
+                        conexion.sendall(cabecera + pagina)
+                        visitas += 1
+                except OSError as error:
+                    print("Cliente HTTP:", error)
+                finally:
+                    conexion.close()
+finally:
+    if dns is not None:
+        dns.close()
+    if web is not None:
+        web.close()
+    ap.active(False)
+    print("Portal cerrado. Solicitudes HTTP:", visitas)
+</script>
+
+<script type="text/x-python" id="local-compat">
+# Compatibilidad básica de tiempo para Python puro generado por bloques.
+import time
+import sys
+import json
+import binascii
+time.sleep_ms = lambda ms: time.sleep(ms / 1000)
+time.ticks_ms = lambda: int(time.monotonic() * 1000)
+time.ticks_add = lambda ticks, delta: ticks + delta
+time.ticks_diff = lambda end, start: end - start
+sys.modules.setdefault("utime", time)
+sys.modules.setdefault("ujson", json)
+sys.modules.setdefault("ubinascii", binascii)
+</script>
+
 <script>
 /* ============================================================================
-   EspWebStudio v2.0.0 — IDE MicroPython para ESP32
+   EspWebStudio v3.4.0 — IDE MicroPython para ESP32
    ---------------------------------------------------------------------------
    100% cliente. Sin backend. Web Serial API + CodeMirror 5 + xterm.js.
    Licencia: MIT
@@ -1291,14 +1599,19 @@ function toast(message, kind='info', timeout=3200) {
 /* ---------- Modal helpers ---------- */
 function openOverlay(id)  { $('#'+id).classList.remove('hidden'); }
 function closeOverlay(id) { $('#'+id).classList.add('hidden'); }
-$$('[data-close]').forEach(b => b.addEventListener('click', () => closeOverlay(b.dataset.close)));
+function closeRequestedOverlay(id) {
+  closeOverlay(id);
+}
+$$('[data-close]').forEach(b => b.addEventListener('click', () => closeRequestedOverlay(b.dataset.close)));
 $$('.overlay').forEach(ov => ov.addEventListener('click', e => {
-  if (e.target === ov && ov.dataset.locked !== 'true') ov.classList.add('hidden');
+  if (e.target === ov && ov.dataset.locked !== 'true') closeRequestedOverlay(ov.id);
 }));
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') $$('.overlay').forEach(o => {
-    if (o.dataset.locked !== 'true') o.classList.add('hidden');
-  });
+  if (e.key === 'Escape') {
+    const visible=$$('.overlay:not(.hidden)').filter(o=>o.dataset.locked!=='true');
+    const top=visible.find(o=>o.id==='accessibilityOverlay')||visible.at(-1);
+    if (top) closeRequestedOverlay(top.id);
+  }
 });
 
 /* ============================================================================
@@ -1306,13 +1619,18 @@ document.addEventListener('keydown', e => {
    ============================================================================ */
 const DEFAULT_SETTINGS = {
   theme: 'dark',
+  language: 'es',
+  a11yScale: 100,
+  a11yContrast: false,
+  a11yMotion: false,
+  a11yDyslexia: false,
   fontSize: 13.5,
   tabSize: 4,
   baud: 115200,
   autocomplete: true,
   lineNumbers: true,
   wordWrap: false,
-  autoReconnect: true,
+  autoReconnect: false,
 };
 const SETTINGS_KEY = 'espwebstudio.settings';
 
@@ -1331,8 +1649,100 @@ function applyTheme(theme) {
   const icon = theme === 'dark' ? 'moon' : 'sun';
   $('#btnTheme').innerHTML = `<i data-lucide="${icon}"></i>`;
   refreshIcons();
+  if (typeof window.updateBlockTheme === 'function') window.updateBlockTheme(theme);
 }
 applyTheme(settings.theme);
+
+const UI_TEXT = {
+  es:{connect:'Conectar',run:'Ejecutar',runLocal:'Ejecutar local',downloadPy:'Descargar .py',dataPrivacy:'Datos y privacidad',dataHint:'Los bloques y sus claves Wi-Fi se guardan en este navegador. Descarga el .py o exporta el JSON antes de borrar datos.',viewPrivacy:'Ver privacidad',clearLocalData:'Borrar datos guardados',docsLicense:'Licencia MIT',docsAbout:'Acerca de',docsAi:'Uso de IA',docsPrivacy:'Privacidad',save:'Guardar',stop:'Detener',firmware:'Firmware',examples:'Ejemplos',blocks:'Bloques',code:'Código',accessibility:'Accesibilidad',interfaceSize:'Tamaño de interfaz',highContrast:'Contraste alto',reduceMotion:'Reducir animaciones',dyslexiaFont:'Tipografía para dislexia',dyslexiaHint:'Usa OpenDyslexic en la interfaz, el código y los bloques; puedes desactivarla cuando quieras.',boardProfile:'Perfil:',blocksHelp:'Ayuda de bloques',a11yHint:'La navegación por teclado muestra el foco. Pulsa Alt+A para abrir este menú y Esc para cerrarlo.',done:'Listo',settings:'Ajustes',appearance:'Apariencia',language:'Idioma de la interfaz',theme:'Tema',editorFont:'Tamaño de fuente del editor',tabSize:'Tamaño de pestaña',connection:'Conexión',editor:'Editor',cancel:'Cancelar',examplesTitle:'Ejemplos ESP32 / MicroPython',examplesIntro:'Cada ejemplo se abre en la vista actual, Código o Bloques. Cambia SSID y clave antes de conectar Wi-Fi. Para Python sin hardware, usa Ejecutar local sin placa.',searchExamples:'Buscar ejemplos',close:'Cerrar',blocksTitle:'Estudio visual · MicroPython ESP32',viewExamples:'Ver ejemplos',viewCode:'Ver Código del mismo proyecto',openCode:'Abrir en Código',openBlocks:'Abrir en Bloques',visualGroup:'Proyectos visuales',codeGroup:'Ejemplos en Python',groupStart:'Primeros pasos y consola',groupHardware:'GPIO, sensores y energía',groupWifi:'Wi-Fi y servicios',groupRadio:'BLE y ESP-NOW',groupData:'Archivos y datos',groupMore:'Otros proyectos',connectionGuide:'¿Cómo se conectan? Arrastra bloques desde las categorías. Encaja muescas para ordenar instrucciones. Coloca bloques redondos en huecos de la misma forma. Los bloques «hacer» contienen otras instrucciones. Toca un bloque para ver su ayuda; clic derecho permite comentar o duplicar.'},
+  en:{connect:'Connect',run:'Run',runLocal:'Run locally',downloadPy:'Download .py',dataPrivacy:'Data and privacy',dataHint:'Blocks and their Wi-Fi passwords are stored in this browser. Download the .py or export JSON before clearing data.',viewPrivacy:'View privacy',clearLocalData:'Clear saved data',docsLicense:'MIT license',docsAbout:'About',docsAi:'AI use',docsPrivacy:'Privacy',save:'Save',stop:'Stop',firmware:'Firmware',examples:'Examples',blocks:'Blocks',code:'Code',accessibility:'Accessibility',interfaceSize:'Interface size',highContrast:'High contrast',reduceMotion:'Reduce motion',dyslexiaFont:'Dyslexia friendly font',dyslexiaHint:'Use OpenDyslexic in the interface, code and blocks; switch it off at any time.',boardProfile:'Board:',blocksHelp:'Block help',a11yHint:'Keyboard navigation highlights focus. Press Alt+A to open this menu and Esc to close it.',done:'Done',settings:'Settings',appearance:'Appearance',language:'Interface language',theme:'Theme',editorFont:'Editor font size',tabSize:'Tab size',connection:'Connection',editor:'Editor',cancel:'Cancel',examplesTitle:'ESP32 / MicroPython examples',examplesIntro:'Each example opens in the current Code or Blocks view. Set SSID and password before using Wi-Fi. Run hardware-free Python locally without a board.',searchExamples:'Search examples',close:'Close',blocksTitle:'Visual studio · MicroPython ESP32',viewExamples:'Browse examples',viewCode:'View Code in this project',openCode:'Open in Code',openBlocks:'Open in Blocks',visualGroup:'Visual projects',codeGroup:'Python examples',groupStart:'Getting started and console',groupHardware:'GPIO, sensors and power',groupWifi:'Wi-Fi and services',groupRadio:'BLE and ESP-NOW',groupData:'Files and data',groupMore:'Other projects',connectionGuide:'How do blocks connect? Drag blocks from the categories. Snap notches together to order statements. Put round value blocks into matching sockets. The “do” blocks contain statements. Select a block for help; right click to comment or duplicate.'}
+};
+const UI_LITERAL_EN={
+  'Explorador':'Explorer','Sin conexión':'Disconnected','Desconectado':'Disconnected',
+  'Salida':'Output','Atajos de teclado':'Keyboard shortcuts','Entendido':'Got it',
+  'Oscuro':'Dark','Claro':'Light','Velocidad (baudios)':'Baud rate',
+  'Reconectar automáticamente al recargar':'Reconnect automatically on reload',
+  'Usa la API Web Serial para reconectar con el último dispositivo autorizado.':'Uses Web Serial to reconnect to the last authorized device.',
+  'Autocompletado':'Autocomplete','Mostrar números de línea':'Show line numbers',
+  'Ajuste de línea':'Word wrap','Perfil:':'Board:',
+  'ESP32 / otro modelo':'ESP32 / other board',
+  'Verificar placa':'Check board','Importar .json':'Import .json',
+  'Exportar .json':'Export .json','Limpiar':'Clear',
+  'Guía rápida: GPIO, radios y USB de la ESP32-C3':'Quick guide: GPIO, radios and USB on the ESP32-C3',
+  'MicroPython generado · ESP32':'Generated MicroPython · ESP32',
+  'Guardar .py en la placa':'Save .py to board','Ejecutar programa':'Run program',
+  'Editar bloque Python':'Edit Python block','Aplicar al bloque':'Apply to block',
+  'Documentación':'Documentation','Licencia MIT':'MIT license','Acerca de':'About',
+  'Instalar MicroPython':'Install MicroPython','Cerrar':'Close'
+};
+const staticUiNodes=[];
+function collectStaticUi() {
+  if (staticUiNodes.length) return;
+  const roots=['.app','#settingsOverlay','#accessibilityOverlay',
+    '#examplesOverlay','#rawEditorOverlay','#firmwareOverlay','#shortcutsOverlay','#docsOverlay'];
+  for (const selector of roots) {
+    const root=$(selector);
+    if (!root) continue;
+    const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);
+    while (walker.nextNode()) {
+      const node=walker.currentNode,original=node.textContent;
+      if (!UI_LITERAL_EN[original.trim()] || node.parentElement.closest('[data-i18n],script,style,.CodeMirror,#xterm,#outputPane,#blocklyCode,#blocklyWorkspace')) continue;
+      staticUiNodes.push([node,original]);
+    }
+  }
+}
+function ui(key) { return (UI_TEXT[settings.language]||UI_TEXT.es)[key] || UI_TEXT.es[key] || key; }
+function applyLanguage(language) {
+  settings.language=language==='en'?'en':'es';
+  document.documentElement.lang=settings.language;
+  $$('[data-i18n]').forEach(el=>{ el.textContent=ui(el.dataset.i18n); });
+  collectStaticUi();
+  for (const [node,original] of staticUiNodes) {
+    const match=/^(\s*)([\s\S]*?)(\s*)$/.exec(original);
+    node.textContent=match[1]+(settings.language==='en'?UI_LITERAL_EN[match[2]]||match[2]:match[2])+match[3];
+  }
+  updateBlockGuidance();
+  showSidebar(!$('#workspace').classList.contains('sidebar-collapsed'));
+  if (visualWorkspace) visualWorkspace.updateToolbox(localizedToolbox());
+  saveSettings(settings);
+}
+function applyAccessibility() {
+  settings.a11yScale=Math.max(100,Math.min(150,Number(settings.a11yScale)||100));
+  document.documentElement.style.setProperty('--a11y-scale',String(settings.a11yScale/100));
+  document.documentElement.classList.toggle('a11y-large',settings.a11yScale>100);
+  document.documentElement.classList.toggle('a11y-contrast',!!settings.a11yContrast);
+  document.documentElement.classList.toggle('a11y-reduce-motion',!!settings.a11yMotion);
+  document.documentElement.classList.toggle('a11y-dyslexia',!!settings.a11yDyslexia);
+  $('#a11yScale').value=String(settings.a11yScale);
+  $('#a11yScaleValue').textContent=settings.a11yScale+' %';
+  $('#a11yContrast').checked=!!settings.a11yContrast;
+  $('#a11yMotion').checked=!!settings.a11yMotion;
+  $('#a11yDyslexia').checked=!!settings.a11yDyslexia;
+  const refreshTypography=()=>{
+    cm.refresh();
+    if (visualWorkspace) {
+      visualWorkspace.getAllBlocks(false).forEach(block=>block.render?.());
+      window.Blockly.svgResize(visualWorkspace);
+    }
+    fitAddon.fit();
+  };
+  if (settings.a11yDyslexia && document.fonts?.load)
+    document.fonts.load('14px OpenDyslexic').then(refreshTypography,refreshTypography);
+  else setTimeout(refreshTypography,30);
+  saveSettings(settings);
+}
+$('#btnAccessibility').addEventListener('click',()=>openOverlay('accessibilityOverlay'));
+$('#a11yScale').addEventListener('input',e=>{settings.a11yScale=+e.target.value;applyAccessibility();});
+$('#a11yContrast').addEventListener('change',e=>{settings.a11yContrast=e.target.checked;applyAccessibility();});
+$('#a11yMotion').addEventListener('change',e=>{settings.a11yMotion=e.target.checked;applyAccessibility();});
+$('#a11yDyslexia').addEventListener('change',e=>{settings.a11yDyslexia=e.target.checked;applyAccessibility();});
+document.addEventListener('keydown',e=>{
+  if (e.altKey && !e.ctrlKey && !e.metaKey && e.key.toLowerCase()==='a') {
+    e.preventDefault();
+    $('#accessibilityOverlay').classList.toggle('hidden');
+    if (!$('#accessibilityOverlay').classList.contains('hidden')) $('#a11yScale').focus();
+  }
+});
 
 /* ============================================================================
    3. SERIAL MANAGER
@@ -1599,7 +2009,7 @@ term.onData(data => {
 });
 window.addEventListener('resize', () => fitAddon.fit());
 
-term.writeln('\x1b[1;36m  EspWebStudio v2.0.0\x1b[0m');
+term.writeln('\x1b[1;36m  EspWebStudio v3.4.0\x1b[0m');
 term.writeln('\x1b[90m  IDE MicroPython para placas ESP32 (C3, S3, clásico…)\x1b[0m');
 term.writeln('');
 term.writeln('\x1b[33m▸ Conecta tu placa por USB con Chrome o Edge (Web Serial API)\x1b[0m');
@@ -1748,6 +2158,7 @@ function newDoc(name=null, content='', isLocal=true) {
   const doc = {
     id: 'doc_' + Math.random().toString(36).slice(2, 10),
     name, content, dirty: false, isLocal,
+    blockState:null, blockSource:null, blockStateHash:null, exampleGuide:null,
   };
   state.docs.push(doc);
   activateDoc(doc.id);
@@ -1761,6 +2172,11 @@ function activateDoc(id) {
   const doc = state.docs.find(d => d.id === id);
   if (!doc) return;
   const prev = activeDoc();
+  const wasBlocks=isBlockMode();
+  if (wasBlocks && prev && prev.id!==id && visualWorkspace && visualDocId===prev.id) {
+    clearTimeout(blocksTimer);
+    syncBlocksToDoc();
+  }
   if (prev && prev.id !== id) prev.content = cm.getValue();
 
   state.activeId = id;
@@ -1770,12 +2186,14 @@ function activateDoc(id) {
   renderTabs();
   updateEditorMode();
   if (!doc.isLocal) highlightActiveFile(doc.devicePath || doc.name);
+  if (wasBlocks && prev?.id!==id) openBlockEditor();
 }
 
 function closeDoc(id) {
   const idx = state.docs.findIndex(d => d.id === id);
   if (idx === -1) return;
   const doc = state.docs[idx];
+  if (id===state.activeId && isBlockMode() && visualDocId===id) syncBlocksToDoc();
   if (doc.dirty) {
     if (!confirm(`"${doc.name || 'Sin título'}" tiene cambios sin guardar. ¿Cerrar de todas formas?`)) return;
   }
@@ -2148,25 +2566,112 @@ function exportActiveDoc() {
   const blob = new Blob([doc.content], { type: 'text/plain;charset=utf-8' });
   const url = URL.createObjectURL(blob);
   const a = Object.assign(document.createElement('a'), { href: url, download: name });
+  document.body.appendChild(a);
   a.click();
-  URL.revokeObjectURL(url);
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
   toast(`Exportado: ${name}`, 'success');
 }
+function downloadCurrentProgram() {
+  if (isBlockMode() && (!getBlockPython() || syncBlocksToDoc()===null)) return;
+  exportActiveDoc();
+}
+$('#btnDownloadCode').addEventListener('click', downloadCurrentProgram);
 
 /* ---------- Ejecutar en RAM (Raw REPL, salida capturada) ---------- */
-async function runInRam() {
-  if (!serial.connected) { toast('Conecta la placa primero', 'warn'); return; }
+// Pyodide se carga solo para ejecución local. El Worker mantiene la UI libre.
+// La placa sigue siendo necesaria para machine, network, bluetooth y otros periféricos.
+const LOCAL_PYODIDE_URL='https://cdn.jsdelivr.net/pyodide/v314.0.7/full/';
+const LOCAL_WORKER_SOURCE=`import { loadPyodide } from '${LOCAL_PYODIDE_URL}pyodide.mjs';
+let runtime;
+self.onmessage=async ({data})=>{
+  const id=data.id;
+  try {
+    self.postMessage({id,kind:'loading'});
+    if (!runtime) {
+      runtime=await loadPyodide({indexURL:'${LOCAL_PYODIDE_URL}'});
+      await runtime.runPythonAsync(data.compat);
+    }
+    runtime.setStdout({batched:text=>self.postMessage({id,kind:'stdout',text})});
+    runtime.setStderr({batched:text=>self.postMessage({id,kind:'stderr',text})});
+    const globals=runtime.globals.get('dict')();
+    try { await runtime.runPythonAsync(data.code,{globals}); }
+    finally { globals.destroy(); }
+    self.postMessage({id,kind:'done'});
+  } catch (error) {
+    self.postMessage({id,kind:'error',text:String(error?.message||error)});
+  }
+};`;
+let localWorker=null,localRunning=false,localRunId=0,localHasOutput=false;
+function finishLocalRun() {
+  localRunning=false;
+  setBusy(false);
+  updateStatusBar();
+}
+function ensureLocalWorker() {
+  if (localWorker) return localWorker;
+  const url=URL.createObjectURL(new Blob([LOCAL_WORKER_SOURCE],{type:'text/javascript'}));
+  try { localWorker=new Worker(url,{type:'module'}); }
+  finally { URL.revokeObjectURL(url); }
+  localWorker.onmessage=({data})=>{
+    if (data.id!==localRunId || !localRunning) return;
+    if (data.kind==='loading') logOutput('Cargando Python local (primera vez requiere Internet)…','sys');
+    if (data.kind==='stdout' || data.kind==='stderr') {
+      localHasOutput=true;
+      logOutput(data.text,data.kind==='stdout'?'line':'err');
+    }
+    if (data.kind==='error') {
+      logOutput('✗ '+data.text,'err');
+      if (/No module named ['"]?(?:machine|network|espnow|bluetooth|esp32|neopixel)/.test(data.text))
+        logOutput('Este módulo necesita una ESP32 con MicroPython: conecta la placa y ejecuta allí.','sys');
+      finishLocalRun();
+    }
+    if (data.kind==='done') {
+      if (!localHasOutput) logOutput('(sin salida)','sys');
+      finishLocalRun();
+    }
+  };
+  localWorker.onerror=event=>{
+    event.preventDefault();
+    logOutput('No se pudo cargar Python local. Comprueba la conexión a Internet y vuelve a intentar.','err');
+    localWorker?.terminate();localWorker=null;
+    if (localRunning) finishLocalRun();
+  };
+  return localWorker;
+}
+function runLocalPython(codeOverride=null,sourceName=null) {
+  if (localRunning || state.running) {toast('Ya hay una ejecución en curso','warn');return;}
+  const code=typeof codeOverride==='string'?codeOverride:cm.getValue();
+  if (!code.trim()) {toast('El programa está vacío','warn');return;}
+  localRunning=true;localHasOutput=false;
+  setBusy(true,'Python local…');updateStatusBar();
+  switchTermTab('output');
+  logOutput('▸ '+(sourceName||activeDoc()?.name||'Sin título')+' — Python local — '+new Date().toLocaleTimeString(),'head');
+  try {ensureLocalWorker().postMessage({id:++localRunId,code,
+    compat:$('#local-compat').textContent});}
+  catch (error) {logOutput('✗ '+error.message,'err');finishLocalRun();}
+}
+function stopLocalPython() {
+  if (!localRunning) return false;
+  localWorker?.terminate();localWorker=null;
+  localRunId++;
+  logOutput('Ejecución local interrumpida.','sys');
+  finishLocalRun();
+  return true;
+}
+async function runInRam(codeOverride=null, sourceName=null) {
+  if (!serial.connected) { runLocalPython(codeOverride,sourceName); return; }
   if (state.running) { toast('Ya hay una ejecución en curso', 'warn'); return; }
   const doc = activeDoc();
-  let code = cm.getValue();
-  if (!code.trim()) { toast('El editor está vacío', 'warn'); return; }
+  let code = typeof codeOverride === 'string' ? codeOverride : cm.getValue();
+  if (!code.trim()) { toast('El programa está vacío', 'warn'); return; }
   if (!code.endsWith('\n')) code += '\n';
 
   state.running = true;
   setBusy(true, 'Ejecutando…');
   updateStatusBar();
   switchTermTab('output');
-  logOutput(`▸ ${doc?.name || 'Sin título'} — ${new Date().toLocaleTimeString()}`, 'head');
+  logOutput(`▸ ${sourceName || doc?.name || 'Sin título'} — ${new Date().toLocaleTimeString()}`, 'head');
 
   try {
     await serial.write('\x03');           // interrumpir ejecución previa
@@ -2184,6 +2689,1566 @@ async function runInRam() {
     updateStatusBar();
   }
 }
+
+/* ============================================================================
+   8b. ESTUDIO VISUAL ESP32 — BLOCKLY / MICROPYTHON
+   ============================================================================ */
+const BLOCKS_CDN = 'https://unpkg.com/blockly@13.3.0/';
+const BLOCKS_STORAGE_KEY = 'espwebstudio.blocks.v1';
+const BLOCKS_BOARD_KEY = 'espwebstudio.blocks.board';
+function blockStateSignature(data) {
+  return JSON.stringify(data,(key,value)=>(key==='x'||key==='y')?undefined:value);
+}
+let visualWorkspace = null;
+let visualDocId = null;
+let blocksLoader = null;
+let blocksRuntimeLoader = null;
+let blocksTimer = null;
+let blockThemes = null;
+
+function loadBlocksScript(path) {
+  return new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = BLOCKS_CDN + path;
+    script.onload = resolve;
+    script.onerror = () => {
+      script.remove();
+      reject(new Error('No se pudo cargar Blockly (' + path + '). Comprueba Internet.'));
+    };
+    document.head.appendChild(script);
+  });
+}
+
+const BLOCK_LABEL_EN={
+  mp_sleep_ms:'wait %1 ms',mp_forever:'repeat forever',mp_every:'repeat every %1 ms',
+  mp_board_info:'show board, memory and reset info',mp_free_mem:'free memory (bytes)',
+  mp_ticks_ms:'time since boot (ms)',mp_lightsleep:'light sleep %1 ms',mp_deepsleep:'deep sleep %1 ms',
+  mp_pin_write:'set GPIO %1 to %2',mp_gpio_set:'write value %2 to GPIO %1',
+  mp_gpio_input:'GPIO %1 input %2',mp_pin_read:'read GPIO %1',mp_pin_toggle:'toggle GPIO %1',
+  mp_blink:'blink GPIO %1 %2 times, %3 ms (active %4)',
+  mp_gpio_watch:'watch GPIO %1 for %2 seconds and on change',
+  mp_adc_read:'ADC GPIO %1 (0–65535)',mp_adc_monitor:'sample ADC GPIO %1 %2 times every %3 ms',
+  mp_adc_alarm:'ADC GPIO %1 alarm above %2, LED GPIO %3, %4 samples',
+  mp_pwm_start:'PWM GPIO %1 frequency %2 Hz duty %3 / 65535',
+  mp_pwm_duty:'PWM GPIO %1 change duty to %2 / 65535',mp_pwm_stop:'stop PWM GPIO %1',
+  mp_rgb_set:'external NeoPixel GPIO %1 LED %2 of %3 → R %4 G %5 B %6',
+  mp_i2c_scan:'scan I²C SDA %1 SCL %2',
+  mp_i2c_read:'I²C SDA %1 SCL %2 read device 0x%3 register 0x%4 bytes %5',
+  mp_i2c_write:'I²C SDA %1 SCL %2 write device 0x%3 register 0x%4 value 0x%5',
+  mp_spi_xfer:'SPI SCK %1 MOSI %2 MISO %3 CS %4 send HEX %5',
+  mp_uart_send:'UART1 TX %1 RX %2 baud %3 send %4',
+  mp_uart_recv:'UART1 TX %1 RX %2 baud %3 read for %4 ms',
+  mp_usb_print:'print over USB/REPL %1',mp_usb_info:'show REPL and board info',
+  mp_wifi_ap:'enable Wi-Fi AP SSID %1 password %2 channel %3',
+  mp_wifi_ap_stop:'stop Wi-Fi AP',
+  mp_wifi_sta:'connect STA SSID %1 password %2 timeout %3 s',
+  mp_wifi_disconnect:'disconnect Wi-Fi STA',mp_wifi_connected:'Wi-Fi STA connected',
+  mp_wifi_rssi_value:'current STA RSSI (dBm; -127 if offline)',
+  mp_wifi_rssi:'sample RSSI %1 times every %2 ms',
+  mp_wifi_scan:'scan networks and show RSSI',mp_wifi_info:'show IP, MAC, channel and RSSI',
+  mp_http_get:'HTTP GET host %1 path %2 (no TLS)',
+  mp_http_server:'HTTP server port %1 reply %2 to %3 requests',
+  mp_captive_demo:'educational captive portal AP %1 password %2 (45 s)',
+  mp_ble_advertise:'BLE advertise name %1',mp_ble_scan:'BLE scan %1 seconds',
+  mp_ble_gatt_led:'BLE GATT LED GPIO %1 name %2 active %3',mp_ble_stop:'stop BLE',
+  mp_now_start:'start ESP-NOW and show MAC/channel',
+  mp_now_peer:'ESP-NOW add peer MAC %1',mp_now_send:'ESP-NOW send to MAC %1 message %2',
+  mp_now_recv:'ESP-NOW receive %1 times (wait %2 ms)',
+  mp_now_on_message:'ESP-NOW receive %1 times (wait %2 ms) and process',
+  mp_now_message:'received ESP-NOW message',mp_now_stop:'stop ESP-NOW',
+  mp_file_write:'write file %1 text %2 mode %3',mp_file_read:'read file %1',
+  mp_file_list:'list board files',mp_nvs_set:'NVS namespace %1 key %2 save integer %3',
+  mp_nvs_get:'NVS namespace %1 key %2 read integer',
+  mp_wdt_start:'start watchdog %1 ms',mp_wdt_feed:'feed watchdog'
+};
+
+function registerMicroPythonBlocks(B, py) {
+  const number = (name, value, min=0, max=65535) => ({
+    type:'field_number', name, value, min, max, precision:1
+  });
+  const textField = (name, value) => ({type:'field_input', name, text:value});
+  const menu = (name, options) => ({type:'field_dropdown', name, options});
+  const statement = (type, message0, args0=[], colour=200, tooltip='') => ({
+    type, message0, args0, previousStatement:null, nextStatement:null, colour, tooltip
+  });
+  const output = (type, message0, args0=[], result=null, colour=200, tooltip='') => ({
+    type, message0, args0, output:result, colour, tooltip
+  });
+  const body = (type, message0, args0=[], colour=200, tooltip='') => ({
+    type, message0, args0, message1:'hacer %1',
+    args1:[{type:'input_statement',name:'DO'}],
+    previousStatement:null, nextStatement:null, colour, tooltip
+  });
+  const value = (name, check=null) => ({type:'input_value',name,check});
+  const C = {
+    system:205, gpio:30, analog:45, bus:190, wifi:260,
+    ble:290, now:330, data:125, serial:175
+  };
+  const definitions=[
+    // Control y placa.
+    statement('mp_sleep_ms','esperar %1 ms',[number('MS',500,0,3600000)],C.system),
+    body('mp_forever','repetir para siempre',[],C.system,'Usa Detener para interrumpir; para un arranque continuo guarda el programa como main.py.'),
+    body('mp_every','repetir siempre cada %1 ms',[number('MS',1000,1,3600000)],C.system),
+    statement('mp_board_info','mostrar datos de placa, memoria y reset',[],C.system),
+    output('mp_free_mem','memoria libre (bytes)',[],'Number',C.system),
+    output('mp_ticks_ms','tiempo desde inicio (ms)',[],'Number',C.system),
+    statement('mp_lightsleep','reposo ligero %1 ms',[number('MS',2000,1,600000)],C.system),
+    statement('mp_deepsleep','reposo profundo %1 ms',[number('MS',10000,1,3600000)],C.system,
+      'El ESP32 se reinicia al despertar. Se corta la conexión USB durante el reposo.'),
+    // GPIO y eventos.
+    statement('mp_pin_write','GPIO %1 poner en %2',[number('PIN',8,0,48),
+      menu('LEVEL',[['ALTO','1'],['BAJO','0']])],C.gpio),
+    statement('mp_gpio_set','GPIO %1 escribir valor %2',[number('PIN',8,0,48),value('VALUE','Number')],C.gpio),
+    statement('mp_gpio_input','GPIO %1 como entrada %2',[number('PIN',4,0,48),
+      menu('PULL',[['sin pull','NONE'],['pull-up','UP'],['pull-down','DOWN']])],C.gpio),
+    output('mp_pin_read','leer GPIO %1',[number('PIN',4,0,48)],'Number',C.gpio),
+    statement('mp_pin_toggle','invertir GPIO %1',[number('PIN',8,0,48)],C.gpio),
+    statement('mp_blink','parpadear LED GPIO %1 %2 veces cada %3 ms (encendido %4)',
+      [number('PIN',8,0,48),number('TIMES',5,1,1000),number('MS',500,1,10000),
+      menu('ACTIVE',[['BAJO (0)','0'],['ALTO (1)','1']])],C.gpio,
+      'En muchas C3 Super Mini el LED integrado en GPIO8 se enciende con nivel BAJO.'),
+    body('mp_gpio_watch','vigilar GPIO %1 %2 segundos y al cambiar',
+      [number('PIN',4,0,48),number('SECONDS',10,1,120)],C.gpio,
+      'Consulta el estado cada 20 ms. No usa IRQ, por lo que se pueden colocar bloques de impresión en el cuerpo.'),
+    // ADC, PWM y LED RGB.
+    output('mp_adc_read','ADC GPIO %1 (0–65535)',[number('PIN',0,0,48)],'Number',C.analog),
+    statement('mp_adc_monitor','ADC GPIO %1: %2 muestras cada %3 ms',
+      [number('PIN',0,0,48),number('COUNT',10,1,1000),number('MS',500,1,60000)],C.analog),
+    statement('mp_adc_alarm','alarma ADC GPIO %1 umbral %2 LED GPIO %3 (%4 muestras)',
+      [number('PIN',0,0,48),number('THRESHOLD',30000,0,65535),
+       number('LED',8,0,48),number('COUNT',20,1,1000)],C.analog,
+      'Conecta un sensor de máximo 3,3 V. GPIO8 suele ser LED activo en bajo; revisa tu placa.'),
+    statement('mp_pwm_start','PWM GPIO %1 frecuencia %2 Hz brillo %3 / 65535',
+      [number('PIN',10,0,48),number('FREQ',1000,1,40000),number('DUTY',32768,0,65535)],C.analog),
+    statement('mp_pwm_duty','PWM GPIO %1 cambiar brillo a %2 / 65535',
+      [number('PIN',10,0,48),value('DUTY','Number')],C.analog),
+    statement('mp_pwm_stop','detener PWM GPIO %1',[number('PIN',10,0,48)],C.analog),
+    statement('mp_rgb_set','NeoPixel externo GPIO %1 LED %2 de %3 → R %4 G %5 B %6',
+      [number('PIN',10,0,48),number('INDEX',0,0,255),number('COUNT',1,1,256),
+      number('R',255,0,255),number('G',0,0,255),number('B',40,0,255)],C.analog,
+      'Requiere un LED direccionable WS2812 conectado y el módulo neopixel del firmware.'),
+    // Buses.
+    statement('mp_i2c_scan','I²C escanear SDA %1 SCL %2',
+      [number('SDA',4,0,48),number('SCL',5,0,48)],C.bus),
+    statement('mp_i2c_read','I²C SDA %1 SCL %2 leer dispositivo 0x%3 registro 0x%4 bytes %5',
+      [number('SDA',4,0,48),number('SCL',5,0,48),
+       textField('ADDR','3C'),textField('REG','00'),number('LEN',4,1,64)],C.bus),
+    statement('mp_i2c_write','I²C SDA %1 SCL %2 escribir dispositivo 0x%3 registro 0x%4 dato 0x%5',
+      [number('SDA',4,0,48),number('SCL',5,0,48),
+       textField('ADDR','3C'),textField('REG','00'),textField('DATA','01')],C.bus),
+    statement('mp_spi_xfer','SPI SCK %1 MOSI %2 MISO %3 CS %4 enviar HEX %5',
+      [number('SCK',4,0,48),number('MOSI',6,0,48),number('MISO',7,0,48),
+       number('CS',5,0,48),textField('HEX','9F000000')],C.bus),
+    // UART y USB Serial/JTAG.
+    statement('mp_uart_send','UART1 TX %1 RX %2 baud %3 enviar %4',
+      [number('TX',4,0,48),number('RX',5,0,48),number('BAUD',115200,1200,921600),
+       textField('MESSAGE','Hola ESP32')],C.serial),
+    statement('mp_uart_recv','UART1 TX %1 RX %2 baud %3 leer hasta %4 ms',
+      [number('TX',4,0,48),number('RX',5,0,48),number('BAUD',115200,1200,921600),
+       number('TIMEOUT',2000,1,30000)],C.serial),
+    statement('mp_usb_print','mostrar por USB/REPL %1',[value('TEXT')],C.serial,
+      'print() sale por la consola REPL USB/serial y por el panel Salida al ejecutar.'),
+    statement('mp_usb_info','mostrar identificador y datos del puerto REPL',[],C.serial),
+    // Wi-Fi.
+    statement('mp_wifi_ap','activar Wi-Fi AP SSID %1 clave %2 canal %3',
+      [textField('SSID','ESP32-C3-Aula'),textField('KEY','CambiaEstaClave123'),
+       number('CHANNEL',1,1,11)],C.wifi,'La clave WPA2 debe tener al menos 8 caracteres.'),
+    statement('mp_wifi_ap_stop','desactivar punto de acceso AP',[],C.wifi),
+    statement('mp_wifi_sta','conectar STA red %1 clave %2 espera %3 s',
+      [textField('SSID','TU_RED_WIFI'),textField('KEY','TU_CLAVE'),
+       number('TIMEOUT',15,1,120)],C.wifi),
+    statement('mp_wifi_disconnect','desconectar Wi-Fi STA',[],C.wifi),
+    output('mp_wifi_connected','Wi-Fi STA conectado',[],'Boolean',C.wifi),
+    output('mp_wifi_rssi_value','RSSI actual STA (dBm; -127 sin conexión)',[],'Number',C.wifi),
+    statement('mp_wifi_rssi','medir RSSI %1 veces cada %2 ms',
+      [number('COUNT',10,1,1000),number('INTERVAL',1000,0,60000)],C.wifi),
+    statement('mp_wifi_scan','escanear redes y mostrar RSSI',[],C.wifi),
+    statement('mp_wifi_info','mostrar IP, MAC, canal y RSSI',[],C.wifi),
+    statement('mp_http_get','HTTP GET host %1 ruta %2 (sin TLS)',
+      [textField('HOST','example.com'),textField('PATH','/')],C.wifi,
+      'Solo HTTP sin cifrado. Conecta STA antes. Para HTTPS se requiere soporte TLS del firmware.'),
+    statement('mp_http_server','servidor HTTP puerto %1 responder %2 a %3 solicitudes',
+      [number('PORT',8080,1024,65535),textField('REPLY','Hola desde ESP32-C3'),
+       number('COUNT',3,1,10)],C.wifi,
+      'Necesita STA o AP activo. Espera hasta 10 segundos por solicitud.'),
+    statement('mp_captive_demo','portal cautivo educativo AP %1 clave %2 (45 s)',
+      [textField('SSID','EspWebStudio_Demo'),textField('KEY','DemoSegura123')],C.wifi,
+      'Red propia y autorizada. DNS/HTTP por 45 s; no solicita ni guarda credenciales.'),
+    // Bluetooth Low Energy; C3 no dispone de Bluetooth Classic.
+    statement('mp_ble_advertise','BLE anunciar nombre %1',[textField('NAME','ESP32-C3-BLE')],C.ble),
+    statement('mp_ble_scan','BLE escanear %1 segundos',[number('SECONDS',5,1,30)],C.ble),
+    statement('mp_ble_gatt_led','BLE GATT controlar LED GPIO %1 nombre %2 activo %3',
+      [number('PIN',8,0,48),textField('NAME','C3-Led'),
+       menu('ACTIVE',[['BAJO (0)','0'],['ALTO (1)','1']])],C.ble,
+      'Servicio UUID FFF0, característica escribible FFF1; escribe 1/ON o 0/OFF desde un cliente BLE.'),
+    statement('mp_ble_stop','detener BLE',[],C.ble),
+    // ESP-NOW.
+    statement('mp_now_start','iniciar ESP-NOW y mostrar MAC/canal',[],C.now),
+    statement('mp_now_peer','ESP-NOW registrar par MAC %1',
+      [textField('MAC','FF:FF:FF:FF:FF:FF')],C.now,
+      'Las MAC tienen 6 bytes. Ambos equipos deben estar en el mismo canal Wi-Fi.'),
+    statement('mp_now_send','ESP-NOW enviar a MAC %1 mensaje %2',
+      [textField('MAC','FF:FF:FF:FF:FF:FF'),textField('MESSAGE','Hola por ESP-NOW')],C.now),
+    statement('mp_now_recv','ESP-NOW recibir %1 veces (espera %2 ms)',
+      [number('COUNT',5,1,100),number('TIMEOUT',1000,0,30000)],C.now),
+    body('mp_now_on_message','ESP-NOW recibir %1 veces (espera %2 ms) y procesar',
+      [number('COUNT',5,1,100),number('TIMEOUT',1000,0,30000)],C.now),
+    output('mp_now_message','mensaje ESP-NOW recibido',[],'String',C.now,
+      'Se utiliza dentro de recibir y procesar.'),
+    statement('mp_now_stop','detener ESP-NOW',[],C.now),
+    // Archivos / NVS / supervisión.
+    statement('mp_file_write','escribir archivo %1 texto %2 modo %3',
+      [textField('PATH','datos.txt'),textField('TEXT','Hola'),
+       menu('MODE',[['reemplazar','w'],['agregar','a']])],C.data),
+    statement('mp_file_read','leer archivo %1',[textField('PATH','datos.txt')],C.data),
+    statement('mp_file_list','listar archivos de la placa',[],C.data),
+    statement('mp_nvs_set','NVS espacio %1 clave %2 guardar entero %3',
+      [textField('NAMESPACE','aula'),textField('KEY','contador'),
+       number('VALUE',1,-2147483648,2147483647)],C.data),
+    statement('mp_nvs_get','NVS espacio %1 clave %2 leer entero',
+      [textField('NAMESPACE','aula'),textField('KEY','contador')],C.data),
+    statement('mp_wdt_start','iniciar watchdog %1 ms',[number('TIMEOUT',10000,3000,120000)],C.data,
+      'Una vez iniciado no puede detenerse sin reiniciar. Alimenta el WDT periódicamente.'),
+    statement('mp_wdt_feed','alimentar watchdog',[],C.data)
+  ];
+  if (settings.language==='en') definitions.forEach(d=>{
+    d.message0=BLOCK_LABEL_EN[d.type]||d.message0;
+    if (d.message1) d.message1='do %1';
+    const choices={'ALTO':'HIGH','BAJO':'LOW','BAJO (0)':'LOW (0)',
+      'ALTO (1)':'HIGH (1)','sin pull':'no pull','reemplazar':'replace','agregar':'append'};
+    for (const arg of d.args0||[]) if (arg.type==='field_dropdown')
+      arg.options=arg.options.map(([label,value])=>[choices[label]||label,value]);
+  });
+  definitions.forEach(d=>{
+    if (!d.tooltip) d.tooltip=d.message0.replace(/%\d+/g,'…')+' — '+
+      (d.output ? (settings.language==='en'?'value: snap into a matching socket.':'valor: encaja en un hueco compatible.') :
+        (settings.language==='en'?'statement: snap above or below another block.':'instrucción: encaja encima o debajo de otra.'));
+  });
+  B.defineBlocksWithJsonArray(definitions);
+
+  // A reversible escape hatch for Python that cannot be inferred as visual blocks.
+  B.Blocks.mp_python_raw={
+    init() {
+      this.appendDummyInput().appendField(settings.language==='en'?'Custom Python':'Python personalizado').appendField(
+        new B.FieldLabelSerializable(settings.language==='en'?'Open Python editor':'Abre «Editar Python»'),'SUMMARY');
+      this.setPreviousStatement(true);
+      this.setNextStatement(true);
+      this.setColour(210);
+      this.data='print("Hola")\n';
+      this.setTooltip('Conserva todo el código. Selecciona este bloque y pulsa Python en la barra para editarlo.');
+    }
+  };
+
+  const gen = py.pythonGenerator;
+  const order = py.Order.ATOMIC;
+  const add = (key, source) => { gen.definitions_[key] = source; };
+  const lines = (...parts) => parts.join('\n') + '\n';
+  const fld = (block, name) => String(block.getFieldValue(name));
+  const lit = (block, name) => JSON.stringify(fld(block, name));
+  const integer = (block, name) => String(Math.trunc(Number(fld(block, name))));
+  const pinVar = block => '_ews_pwm_' + integer(block,'PIN');
+  const bodyCode = block => gen.statementToCode(block,'DO') || gen.INDENT + 'pass\n';
+  const exprCode = (block, input, fallback='0') =>
+    gen.valueToCode(block,input,py.Order.NONE) || fallback;
+  const hook = (type, fn) => { gen.forBlock[type] = fn; };
+  const needTime = () => add('import_time','import time');
+  const needPin = () => add('import_pin','from machine import Pin');
+  const needNetwork = () => add('import_network','import network');
+  const needBle = () => add('import_bluetooth','import bluetooth');
+  const needNow = () => {
+    needNetwork();
+    add('import_espnow','import espnow');
+    add('ews_setup_now',lines(
+      '_ews_now_sta = network.WLAN(network.WLAN.IF_STA)',
+      '_ews_now_sta.active(True)',
+      '_ews_now = espnow.ESPNow()',
+      '_ews_now.active(True)'
+    ));
+  };
+  hook('mp_python_raw', b => {
+    const source=String(b.data||'').replace(/\r\n/g,'\n');
+    return source.endsWith('\n') ? source : source+'\n';
+  });
+  hook('mp_captive_demo', b => $('#example-portal').textContent.trim()
+    .replace(/^SSID = .+$/m,'SSID = '+lit(b,'SSID'))
+    .replace(/^CLAVE = .+$/m,'CLAVE = '+lit(b,'KEY'))+'\n');
+
+  hook('mp_sleep_ms', b => { needTime(); return lines('time.sleep_ms(' + integer(b,'MS') + ')'); });
+  hook('mp_forever', b => {
+    needTime();
+    return 'while True:\n' + bodyCode(b) + gen.INDENT + 'time.sleep_ms(1)\n';
+  });
+  hook('mp_every', b => {
+    needTime();
+    return 'while True:\n' + bodyCode(b) +
+      gen.INDENT + 'time.sleep_ms(' + integer(b,'MS') + ')\n';
+  });
+  hook('mp_board_info', () => {
+    add('import_os','import os');
+    add('import_gc','import gc');
+    add('import_machine','import machine');
+    return lines('print("Placa:", os.uname())','print("ID:", machine.unique_id())',
+      'print("Memoria libre:", gc.mem_free())','print("Causa reset:", machine.reset_cause())');
+  });
+  hook('mp_free_mem', () => { add('import_gc','import gc'); return ['gc.mem_free()',order]; });
+  hook('mp_ticks_ms', () => { needTime(); return ['time.ticks_ms()',order]; });
+  hook('mp_lightsleep', b => {
+    add('import_machine','import machine');
+    return lines('machine.lightsleep(' + integer(b,'MS') + ')');
+  });
+  hook('mp_deepsleep', b => {
+    add('import_machine','import machine');
+    return lines('print("Entrando en reposo profundo; la placa reiniciará al despertar")',
+      'machine.deepsleep(' + integer(b,'MS') + ')');
+  });
+  hook('mp_pin_write', b => {
+    needPin();
+    return lines('Pin(' + integer(b,'PIN') + ', Pin.OUT).value(' + fld(b,'LEVEL') + ')');
+  });
+  hook('mp_gpio_set', b => {
+    needPin();
+    return lines('Pin(' + integer(b,'PIN') + ', Pin.OUT).value(int(' +
+      exprCode(b,'VALUE') + '))');
+  });
+  hook('mp_gpio_input', b => {
+    needPin();
+    const pull = fld(b,'PULL');
+    return lines('Pin(' + integer(b,'PIN') + ', Pin.IN' +
+      (pull === 'NONE' ? '' : ', Pin.PULL_' + pull) + ')');
+  });
+  hook('mp_pin_read', b => {
+    needPin();
+    return ['Pin(' + integer(b,'PIN') + ', Pin.IN).value()',order];
+  });
+  hook('mp_pin_toggle', b => {
+    needPin();
+    const p = integer(b,'PIN');
+    const v='_ews_toggle_'+p;
+    return lines('if '+JSON.stringify(v)+' not in globals():',
+      '    '+v+' = Pin('+p+', Pin.OUT)',
+      v+'.value(1 - '+v+'.value())');
+  });
+  hook('mp_blink', b => {
+    needPin(); needTime();
+    const active = Number(fld(b,'ACTIVE'));
+    return lines('_led = Pin(' + integer(b,'PIN') + ', Pin.OUT, value=' + (1-active) + ')',
+      'for _blink in range(' + integer(b,'TIMES') + '):',
+      '    _led.value(' + active + ')',
+      '    time.sleep_ms(' + integer(b,'MS') + ')',
+      '    _led.value(' + (1-active) + ')',
+      '    time.sleep_ms(' + integer(b,'MS') + ')');
+  });
+  hook('mp_gpio_watch', b => {
+    needPin(); needTime();
+    const id = b.id.replace(/[^a-zA-Z0-9_]/g,'_');
+    const p = '_ews_watch_' + id;
+    return lines(p + ' = Pin(' + integer(b,'PIN') + ', Pin.IN, Pin.PULL_UP)',
+      '_ews_last_' + id + ' = ' + p + '.value()',
+      '_ews_until_' + id + ' = time.ticks_add(time.ticks_ms(), ' +
+         (Number(integer(b,'SECONDS')) * 1000) + ')',
+      'while time.ticks_diff(_ews_until_' + id + ', time.ticks_ms()) > 0:',
+      '    if ' + p + '.value() != _ews_last_' + id + ':',
+      '        _ews_last_' + id + ' = ' + p + '.value()') +
+      '      ' + bodyCode(b).replace(/\n/g,'\n      ').trimEnd() + '\n' +
+      '    time.sleep_ms(20)\n';
+  });
+  hook('mp_adc_read', b => {
+    needPin(); add('import_adc','from machine import ADC');
+    return ['ADC(Pin(' + integer(b,'PIN') + ')).read_u16()',order];
+  });
+  hook('mp_adc_monitor', b => {
+    needPin(); needTime(); add('import_adc','from machine import ADC');
+    return lines('_ews_adc = ADC(Pin(' + integer(b,'PIN') + '))',
+      'for _ews_i in range(' + integer(b,'COUNT') + '):',
+      '    print("ADC", ' + integer(b,'PIN') + ', _ews_adc.read_u16())',
+      '    if _ews_i < ' + integer(b,'COUNT') + ' - 1:',
+      '        time.sleep_ms(' + integer(b,'MS') + ')');
+  });
+  hook('mp_adc_alarm', b => {
+    needPin();needTime();add('import_adc','from machine import ADC');
+    return lines('_ews_sensor = ADC(Pin('+integer(b,'PIN')+'))',
+      '_ews_alarm_led = Pin('+integer(b,'LED')+', Pin.OUT, value=1)',
+      'try:',
+      '    for _ews_sample in range('+integer(b,'COUNT')+'):',
+      '        _ews_level = _ews_sensor.read_u16()',
+      '        _ews_alarm_led.value(0 if _ews_level > '+integer(b,'THRESHOLD')+' else 1)',
+      '        print("Sensor:", _ews_level, "| Alarma:", _ews_level > '+integer(b,'THRESHOLD')+')',
+      '        time.sleep_ms(250)',
+      'finally:',
+      '    _ews_alarm_led.value(1)');
+  });
+  hook('mp_pwm_start', b => {
+    needPin(); add('import_pwm','from machine import PWM');
+    return lines(pinVar(b) + ' = PWM(Pin(' + integer(b,'PIN') + '), freq=' +
+      integer(b,'FREQ') + ', duty_u16=' + integer(b,'DUTY') + ')');
+  });
+  hook('mp_pwm_duty', b => {
+    const key=pinVar(b);
+    return lines('if ' + JSON.stringify(key) + ' in globals():',
+      '    ' + key + '.duty_u16(max(0, min(65535, int(' + exprCode(b,'DUTY') + '))))',
+      'else:',
+      '    print("Primero inicia PWM GPIO ' + integer(b,'PIN') + '")');
+  });
+  hook('mp_pwm_stop', b => {
+    const key=pinVar(b);
+    return lines('if ' + JSON.stringify(key) + ' in globals():',
+      '    ' + key + '.deinit()',
+      '    del ' + key);
+  });
+  hook('mp_rgb_set', b => {
+    needPin(); add('import_neopixel','import neopixel');
+    const count=integer(b,'COUNT'), index=integer(b,'INDEX');
+    return lines('if ' + index + ' >= ' + count + ':',
+      '    print("Índice NeoPixel fuera de rango")',
+      'else:',
+      '    _ews_pixels = neopixel.NeoPixel(Pin(' + integer(b,'PIN') + '), ' + count + ')',
+      '    _ews_pixels[' + index + '] = (' + integer(b,'R') + ', ' +
+             integer(b,'G') + ', ' + integer(b,'B') + ')',
+      '    _ews_pixels.write()');
+  });
+
+  hook('mp_i2c_scan', b => {
+    needPin(); add('import_i2c','from machine import I2C');
+    return lines('_ews_i2c = I2C(0, sda=Pin(' + integer(b,'SDA') +
+      '), scl=Pin(' + integer(b,'SCL') + '), freq=400000)',
+      'print("I²C detectados:", [hex(_a) for _a in _ews_i2c.scan()])');
+  });
+  const i2cInit = b => '_ews_i2c = I2C(0, sda=Pin(' + integer(b,'SDA') +
+    '), scl=Pin(' + integer(b,'SCL') + '), freq=400000)';
+  const hexNumber = (b, field) => 'int(' + lit(b,field) + ', 16)';
+  hook('mp_i2c_read', b => {
+    needPin(); add('import_i2c','from machine import I2C');
+    return lines(i2cInit(b),
+      'print("I²C:", _ews_i2c.readfrom_mem(' +
+       hexNumber(b,'ADDR') + ', ' + hexNumber(b,'REG') + ', ' + integer(b,'LEN') + '))');
+  });
+  hook('mp_i2c_write', b => {
+    needPin(); add('import_i2c','from machine import I2C');
+    return lines(i2cInit(b),
+      '_ews_i2c.writeto_mem(' + hexNumber(b,'ADDR') + ', ' + hexNumber(b,'REG') +
+      ', bytes([' + hexNumber(b,'DATA') + ']))');
+  });
+  hook('mp_spi_xfer', b => {
+    needPin(); add('import_softspi','from machine import SoftSPI');
+    add('import_ubinascii','import ubinascii');
+    return lines('_ews_spi = SoftSPI(baudrate=1000000, polarity=0, phase=0, sck=Pin(' +
+      integer(b,'SCK') + '), mosi=Pin(' + integer(b,'MOSI') +
+      '), miso=Pin(' + integer(b,'MISO') + '))',
+      '_ews_cs = Pin(' + integer(b,'CS') + ', Pin.OUT, value=1)',
+      '_ews_tx = ubinascii.unhexlify(' + lit(b,'HEX') + ')',
+      '_ews_rx = bytearray(len(_ews_tx))',
+      '_ews_cs.value(0)',
+      'try:',
+      '    _ews_spi.write_readinto(_ews_tx, _ews_rx)',
+      'finally:',
+      '    _ews_cs.value(1)',
+      'print("SPI RX:", ubinascii.hexlify(_ews_rx))');
+  });
+  const uartInit = b => '_ews_uart = UART(1, baudrate=' + integer(b,'BAUD') +
+    ', tx=Pin(' + integer(b,'TX') + '), rx=Pin(' + integer(b,'RX') +
+    '), timeout=100)';
+  hook('mp_uart_send', b => {
+    needPin(); add('import_uart','from machine import UART'); needTime();
+    return lines(uartInit(b),
+      '_ews_uart.write(' + JSON.stringify(fld(b,'MESSAGE') + '\n') + ')',
+      'time.sleep_ms(100)', '_ews_uart.deinit()');
+  });
+  hook('mp_uart_recv', b => {
+    needPin(); add('import_uart','from machine import UART'); needTime();
+    return lines(uartInit(b),
+      '_ews_deadline = time.ticks_add(time.ticks_ms(), ' + integer(b,'TIMEOUT') + ')',
+      'while not _ews_uart.any() and time.ticks_diff(_ews_deadline, time.ticks_ms()) > 0:',
+      '    time.sleep_ms(20)',
+      'print("UART RX:", _ews_uart.readline() if _ews_uart.any() else "(sin datos)")',
+      '_ews_uart.deinit()');
+  });
+  hook('mp_usb_print', b => lines('print(' + exprCode(b,'TEXT','""') + ')'));
+  hook('mp_usb_info', () => {
+    add('import_os','import os'); add('import_sys','import sys');
+    return lines('print("REPL:", sys.platform, "|", os.uname().machine)',
+      'print("Consola USB/serial disponible mediante print() y el terminal del IDE")');
+  });
+  hook('mp_wifi_ap', b => {
+    needNetwork();
+    return lines('_ap = network.WLAN(network.WLAN.IF_AP)',
+      '_ap.active(True)',
+      '_ap.config(ssid=' + lit(b,'SSID') + ', key=' + lit(b,'KEY') +
+      ', channel=' + integer(b,'CHANNEL') + ')',
+      'print("AP activo. IP:", _ap.ifconfig()[0], "Canal:", _ap.config("channel"))');
+  });
+  hook('mp_wifi_ap_stop', () => {
+    needNetwork();
+    return lines('network.WLAN(network.WLAN.IF_AP).active(False)');
+  });
+  hook('mp_wifi_sta', b => {
+    needNetwork(); needTime();
+    const timeout = Number(integer(b,'TIMEOUT')) * 1000;
+    return lines('_sta = network.WLAN(network.WLAN.IF_STA)',
+      '_sta.active(True)',
+      'if not _sta.isconnected():',
+      '    _sta.connect(' + lit(b,'SSID') + ', ' + lit(b,'KEY') + ')',
+      '    _inicio = time.ticks_ms()',
+      '    while not _sta.isconnected() and time.ticks_diff(time.ticks_ms(), _inicio) < ' + timeout + ':',
+      '        time.sleep_ms(250)',
+      'if _sta.isconnected():',
+      '    print("Conectado. IP:", _sta.ifconfig()[0])',
+      'else:',
+      '    print("No se pudo conectar. Estado:", _sta.status())',
+      '    _sta.disconnect()');
+  });
+  hook('mp_wifi_disconnect', () => {
+    needNetwork();
+    return lines('network.WLAN(network.WLAN.IF_STA).disconnect()');
+  });
+  hook('mp_wifi_connected', () => {
+    needNetwork();
+    return ['network.WLAN(network.WLAN.IF_STA).isconnected()',order];
+  });
+  hook('mp_wifi_rssi_value', () => {
+    needNetwork();
+    return ['(network.WLAN(network.WLAN.IF_STA).status("rssi") if ' +
+      'network.WLAN(network.WLAN.IF_STA).isconnected() else -127)',py.Order.CONDITIONAL];
+  });
+  hook('mp_wifi_rssi', b => {
+    needNetwork(); needTime();
+    const n = integer(b,'COUNT'), ms = integer(b,'INTERVAL');
+    return lines('_rssi_sta = network.WLAN(network.WLAN.IF_STA)',
+      'if not _rssi_sta.isconnected():',
+      '    print("Conecta el Wi-Fi STA antes de medir RSSI")',
+      'else:',
+      '    for _m in range(' + n + '):',
+      '        if not _rssi_sta.isconnected():',
+      '            print("Se perdió la conexión Wi-Fi")',
+      '            break',
+      '        try:',
+      '            print("Muestra", _m + 1, "/" + str(' + n + '), "RSSI:", _rssi_sta.status("rssi"), "dBm")',
+      '        except OSError as _error:',
+      '            print("No se pudo medir RSSI:", _error)',
+      '            break',
+      '        if _m < ' + n + ' - 1:',
+      '            time.sleep_ms(' + ms + ')');
+  });
+  hook('mp_wifi_scan', () => {
+    needNetwork();
+    return lines('_scan_sta = network.WLAN(network.WLAN.IF_STA)',
+      '_scan_sta.active(True)',
+      'for _ssid, _bssid, _canal, _rssi, _seg, _oculta in _scan_sta.scan():',
+      '    print("SSID:", _ssid.decode("utf-8") if _ssid else "(oculta)",',
+      '          "Canal:", _canal, "RSSI:", _rssi, "dBm")');
+  });
+  hook('mp_wifi_info', () => {
+    needNetwork();
+    return lines('_ews_sta = network.WLAN(network.WLAN.IF_STA)',
+      'print("STA activa:", _ews_sta.active(), "MAC:", _ews_sta.config("mac"))',
+      'if _ews_sta.isconnected():',
+      '    print("IP:", _ews_sta.ifconfig()[0], "RSSI:", _ews_sta.status("rssi"), "dBm")',
+      'else:',
+      '    print("STA sin conexión; estado:", _ews_sta.status())');
+  });
+  hook('mp_http_get', b => {
+    add('import_socket','import socket');
+    return lines('try:',
+      '    _ews_host = ' + lit(b,'HOST'),
+      '    _ews_path = ' + lit(b,'PATH'),
+      '    _ews_address = socket.getaddrinfo(_ews_host, 80)[0][-1]',
+      '    _ews_socket = socket.socket()',
+      '    try:',
+      '        _ews_socket.settimeout(8)',
+      '        _ews_socket.connect(_ews_address)',
+      '        _ews_socket.send(("GET " + _ews_path + " HTTP/1.0\\r\\nHost: " + _ews_host +',
+      '                          "\\r\\nConnection: close\\r\\n\\r\\n").encode())',
+      '        print(_ews_socket.recv(1024).decode("utf-8", "replace"))',
+      '    finally:',
+      '        _ews_socket.close()',
+      'except OSError as _ews_error:',
+      '    print("HTTP falló:", _ews_error)');
+  });
+  hook('mp_http_server', b => {
+    add('import_socket','import socket');
+    return lines('_ews_srv = socket.socket()',
+      'try:',
+      '    _ews_srv.bind(("0.0.0.0", ' + integer(b,'PORT') + '))',
+      '    _ews_srv.listen(1)',
+      '    _ews_srv.settimeout(10)',
+      '    print("HTTP escuchando en puerto", ' + integer(b,'PORT') + ')',
+      '    for _ews_request in range(' + integer(b,'COUNT') + '):',
+      '        try:',
+      '            _ews_client, _ews_addr = _ews_srv.accept()',
+      '        except OSError:',
+      '            print("Tiempo de espera agotado")',
+      '            break',
+      '        try:',
+      '            _ews_client.settimeout(3)',
+      '            _ews_client.recv(512)',
+      '            _ews_body = ' + lit(b,'REPLY') + '.encode("utf-8")',
+      '            _ews_head = ("HTTP/1.0 200 OK\\r\\nContent-Type: text/plain; charset=utf-8\\r\\n"',
+      '                         + "Content-Length: " + str(len(_ews_body)) + "\\r\\n\\r\\n").encode()',
+      '            _ews_client.sendall(_ews_head + _ews_body)',
+      '        finally:',
+      '            _ews_client.close()',
+      'finally:',
+      '    _ews_srv.close()');
+  });
+
+  hook('mp_ble_advertise', b => {
+    needBle();
+    return lines('_ews_ble = bluetooth.BLE()',
+      '_ews_ble.active(True)',
+      '_ews_name = ' + lit(b,'NAME') + '.encode("utf-8")[:26]',
+      '_ews_adv = b"\\x02\\x01\\x06" + bytes((len(_ews_name) + 1, 0x09)) + _ews_name',
+      '_ews_ble.gap_advertise(100000, adv_data=_ews_adv)',
+      'print("BLE anunciando:", ' + lit(b,'NAME') + ')');
+  });
+  hook('mp_ble_scan', b => {
+    needBle(); needTime();
+    const ms = Number(integer(b,'SECONDS')) * 1000;
+    return lines('_ews_ble = bluetooth.BLE()',
+      '_ews_ble.active(True)',
+      '_ews_ble_results = []',
+      '_ews_ble_seen = set()',
+      'def _ews_ble_scan_irq(event, data):',
+      '    if event == 5 and len(_ews_ble_results) < 32:',
+      '        _type, _addr, _adv_type, _rssi, _payload = data',
+      '        _key = bytes(_addr)',
+      '        if _key not in _ews_ble_seen:',
+      '            _ews_ble_seen.add(_key)',
+      '            _ews_ble_results.append((_key, _rssi))',
+      '_ews_ble.irq(_ews_ble_scan_irq)',
+      '_ews_ble.gap_scan(' + ms + ')',
+      'time.sleep_ms(' + (ms + 200) + ')',
+      'for _addr, _rssi in _ews_ble_results:',
+      '    print("BLE MAC:", ":".join("%02x" % _b for _b in _addr), "RSSI:", _rssi, "dBm")',
+      'print("BLE detectados:", len(_ews_ble_results))');
+  });
+  hook('mp_ble_gatt_led', b => {
+    needBle(); needPin();
+    const active = Number(fld(b,'ACTIVE'));
+    return lines('_ews_ble = bluetooth.BLE()',
+      '_ews_ble.active(True)',
+      '_ews_ble_led = Pin(' + integer(b,'PIN') + ', Pin.OUT, value=' + (1-active) + ')',
+      '_ews_service = (bluetooth.UUID(0xFFF0),',
+      '    ((bluetooth.UUID(0xFFF1), bluetooth.FLAG_WRITE | bluetooth.FLAG_WRITE_NO_RESPONSE),))',
+      '((_ews_led_handle,),) = _ews_ble.gatts_register_services((_ews_service,))',
+      'def _ews_ble_led_irq(event, data):',
+      '    if event == 3 and data[1] == _ews_led_handle:',
+      '        _ews_command = _ews_ble.gatts_read(_ews_led_handle)',
+      '        _ews_ble_led.value(' + active + ' if _ews_command in (b"1", b"ON", b"on") else ' + (1-active) + ')',
+      '_ews_ble.irq(_ews_ble_led_irq)',
+      '_ews_name = ' + lit(b,'NAME') + '.encode("utf-8")[:26]',
+      '_ews_adv = b"\\x02\\x01\\x06" + bytes((len(_ews_name) + 1, 0x09)) + _ews_name',
+      '_ews_ble.gap_advertise(100000, adv_data=_ews_adv)',
+      'print("BLE GATT LED: servicio FFF0, característica escribible FFF1")');
+  });
+  hook('mp_ble_stop', () => lines('if "_ews_ble" in globals():',
+    '    _ews_ble.active(False)'));
+  hook('mp_now_start', () => {
+    needNow();
+    return lines('print("ESP-NOW activo. MAC:", _ews_now_sta.config("mac"))',
+      'print("Usa el mismo canal Wi-Fi en ambas placas.")');
+  });
+  const nowPeer = b => {
+    add('import_ubinascii','import ubinascii');
+    return lines('_ews_peer = ubinascii.unhexlify(' +
+      lit(b,'MAC') + '.replace(":", "").replace("-", ""))',
+      'if len(_ews_peer) != 6:',
+      '    raise ValueError("MAC ESP-NOW: usa 6 bytes")',
+      'try:',
+      '    _ews_now.add_peer(_ews_peer)',
+      'except OSError as _ews_peer_error:',
+      '    if "EXIST" not in str(_ews_peer_error):',
+      '        raise');
+  };
+  hook('mp_now_peer', b => {
+    needNow();
+    return nowPeer(b);
+  });
+  hook('mp_now_send', b => {
+    needNow();
+    return nowPeer(b) +
+      lines('_ews_now.send(_ews_peer, ' + lit(b,'MESSAGE') + ')',
+        'print("ESP-NOW enviado a", ' + lit(b,'MAC') + ')');
+  });
+  hook('mp_now_recv', b => {
+    needNow();
+    return lines('for _ews_i in range(' + integer(b,'COUNT') + '):',
+      '    _ews_sender, _ews_message = _ews_now.recv(' + integer(b,'TIMEOUT') + ')',
+      '    if _ews_message is not None:',
+      '        print("ESP-NOW de", _ews_sender, ":", _ews_message)',
+      '    else:',
+      '        print("Sin datos ESP-NOW")');
+  });
+  hook('mp_now_on_message', b => {
+    needNow();
+    const inner = bodyCode(b);
+    return lines('for _ews_i in range(' + integer(b,'COUNT') + '):',
+      '    _ews_sender, _ews_message = _ews_now.recv(' + integer(b,'TIMEOUT') + ')',
+      '    if _ews_message is not None:') +
+      '    ' + inner.replace(/\n/g,'\n    ').trimEnd() + '\n';
+  });
+  hook('mp_now_message', () =>
+    ['globals().get("_ews_message", b"").decode("utf-8", "replace")',order]);
+  hook('mp_now_stop', () => {
+    needNow();
+    return lines('_ews_now.active(False)');
+  });
+  hook('mp_file_write', b => lines('with open(' + lit(b,'PATH') +
+    ', ' + lit(b,'MODE') + ') as _ews_file:',
+    '    _ews_file.write(' + lit(b,'TEXT') + ')',
+    'print("Archivo guardado:", ' + lit(b,'PATH') + ')'));
+  hook('mp_file_read', b => lines('with open(' + lit(b,'PATH') + ', "r") as _ews_file:',
+    '    print(_ews_file.read())'));
+  hook('mp_file_list', () => {
+    add('import_os','import os');
+    return lines('print("Archivos:", os.listdir())');
+  });
+  hook('mp_nvs_set', b => {
+    add('import_esp32','import esp32');
+    return lines('_ews_nvs = esp32.NVS(' + lit(b,'NAMESPACE') + ')',
+      '_ews_nvs.set_i32(' + lit(b,'KEY') + ', ' + integer(b,'VALUE') + ')',
+      '_ews_nvs.commit()',
+      'print("NVS guardado")');
+  });
+  hook('mp_nvs_get', b => {
+    add('import_esp32','import esp32');
+    return lines('_ews_nvs = esp32.NVS(' + lit(b,'NAMESPACE') + ')',
+      'try:',
+      '    print("NVS:", _ews_nvs.get_i32(' + lit(b,'KEY') + '))',
+      'except OSError:',
+      '    print("Clave NVS todavía sin valor")');
+  });
+  hook('mp_wdt_start', b => {
+    add('import_wdt','from machine import WDT');
+    return lines('_ews_wdt = WDT(timeout=' + integer(b,'TIMEOUT') + ')',
+      'print("Watchdog activo; aliméntalo para evitar reinicios")');
+  });
+  hook('mp_wdt_feed', () => lines('if "_ews_wdt" in globals():',
+    '    _ews_wdt.feed()',
+    'else:',
+    '    print("Inicia el watchdog antes de alimentarlo")'));
+}
+
+const BLOCK_TOOLBOX = {
+  kind:'categoryToolbox',
+  contents:[
+    {kind:'category',name:'Programa y tiempo',colour:'#3b82f6',contents:[
+      {kind:'block',type:'mp_sleep_ms'}, {kind:'block',type:'mp_forever'},
+      {kind:'block',type:'mp_every'}, {kind:'block',type:'mp_ticks_ms'},
+      {kind:'block',type:'mp_board_info'}, {kind:'block',type:'mp_free_mem'},
+      {kind:'block',type:'mp_lightsleep'}, {kind:'block',type:'mp_deepsleep'}
+    ]},
+    {kind:'category',name:'GPIO y botones',colour:'#f97316',contents:[
+      {kind:'block',type:'mp_pin_write'}, {kind:'block',type:'mp_gpio_set',
+        inputs:{VALUE:{shadow:{type:'math_number',fields:{NUM:1}}}}},
+      {kind:'block',type:'mp_gpio_input'}, {kind:'block',type:'mp_pin_read'},
+      {kind:'block',type:'mp_pin_toggle'}, {kind:'block',type:'mp_blink'},
+      {kind:'block',type:'mp_gpio_watch'}
+    ]},
+    {kind:'category',name:'ADC, PWM y RGB',colour:'#eab308',contents:[
+      {kind:'block',type:'mp_adc_read'}, {kind:'block',type:'mp_adc_monitor'},
+      {kind:'block',type:'mp_adc_alarm'},
+      {kind:'block',type:'mp_pwm_start'}, {kind:'block',type:'mp_pwm_duty',
+        inputs:{DUTY:{shadow:{type:'math_number',fields:{NUM:10000}}}}},
+      {kind:'block',type:'mp_pwm_stop'}, {kind:'block',type:'mp_rgb_set'}
+    ]},
+    {kind:'category',name:'I²C y SPI',colour:'#06b6d4',contents:[
+      {kind:'block',type:'mp_i2c_scan'}, {kind:'block',type:'mp_i2c_read'},
+      {kind:'block',type:'mp_i2c_write'}, {kind:'block',type:'mp_spi_xfer'}
+    ]},
+    {kind:'category',name:'USB y UART',colour:'#14b8a6',contents:[
+      {kind:'block',type:'mp_usb_print',
+        inputs:{TEXT:{shadow:{type:'text',fields:{TEXT:'Hola desde USB'}}}}},
+      {kind:'block',type:'mp_usb_info'}, {kind:'block',type:'mp_uart_send'},
+      {kind:'block',type:'mp_uart_recv'}
+    ]},
+    {kind:'category',name:'Wi-Fi y HTTP',colour:'#8b5cf6',contents:[
+      {kind:'block',type:'mp_wifi_sta'}, {kind:'block',type:'mp_wifi_connected'},
+      {kind:'block',type:'mp_wifi_rssi'}, {kind:'block',type:'mp_wifi_rssi_value'},
+      {kind:'block',type:'mp_wifi_scan'}, {kind:'block',type:'mp_wifi_info'},
+      {kind:'block',type:'mp_wifi_disconnect'}, {kind:'block',type:'mp_wifi_ap'},
+      {kind:'block',type:'mp_wifi_ap_stop'},
+      {kind:'block',type:'mp_http_get'}, {kind:'block',type:'mp_http_server'},
+      {kind:'block',type:'mp_captive_demo'}
+    ]},
+    {kind:'category',name:'Bluetooth LE',colour:'#a855f7',contents:[
+      {kind:'block',type:'mp_ble_advertise'}, {kind:'block',type:'mp_ble_scan'},
+      {kind:'block',type:'mp_ble_gatt_led'}, {kind:'block',type:'mp_ble_stop'}
+    ]},
+    {kind:'category',name:'ESP-NOW',colour:'#ec4899',contents:[
+      {kind:'block',type:'mp_now_start'}, {kind:'block',type:'mp_now_peer'},
+      {kind:'block',type:'mp_now_send'}, {kind:'block',type:'mp_now_recv'},
+      {kind:'block',type:'mp_now_on_message'}, {kind:'block',type:'mp_now_message'},
+      {kind:'block',type:'mp_now_stop'}
+    ]},
+    {kind:'category',name:'Archivos y NVS',colour:'#22c55e',contents:[
+      {kind:'block',type:'mp_file_write'}, {kind:'block',type:'mp_file_read'},
+      {kind:'block',type:'mp_file_list'}, {kind:'block',type:'mp_nvs_set'},
+      {kind:'block',type:'mp_nvs_get'}, {kind:'block',type:'mp_wdt_start'},
+      {kind:'block',type:'mp_wdt_feed'}
+    ]},
+    {kind:'category',name:'Control',colour:'#d97706',contents:[
+      {kind:'block',type:'controls_if'},
+      {kind:'block',type:'controls_repeat_ext',
+        inputs:{TIMES:{shadow:{type:'math_number',fields:{NUM:10}}}}},
+      {kind:'block',type:'controls_whileUntil'},
+      {kind:'block',type:'controls_for'}, {kind:'block',type:'controls_flow_statements'}
+    ]},
+    {kind:'category',name:'Lógica',colour:'#16a34a',contents:[
+      {kind:'block',type:'logic_compare'}, {kind:'block',type:'logic_boolean'},
+      {kind:'block',type:'logic_operation'}, {kind:'block',type:'logic_negate'}
+    ]},
+    {kind:'category',name:'Matemáticas',colour:'#2563eb',contents:[
+      {kind:'block',type:'math_number'}, {kind:'block',type:'math_arithmetic'},
+      {kind:'block',type:'math_modulo'}, {kind:'block',type:'math_random_int'}
+    ]},
+    {kind:'category',name:'Texto',colour:'#0f766e',contents:[
+      {kind:'block',type:'text'}, {kind:'block',type:'text_join'},
+      {kind:'block',type:'text_length'}, {kind:'block',type:'text_print'}
+    ]},
+    {kind:'category',name:'Python avanzado',colour:'#475569',contents:[
+      {kind:'block',type:'mp_python_raw'}
+    ]},
+    {kind:'category',name:'Variables',custom:'VARIABLE',colour:'#b45309'},
+    {kind:'category',name:'Funciones',custom:'PROCEDURE',colour:'#7c3aed'}
+  ]
+};
+
+const TOOLBOX_EN={
+  'Programa y tiempo':'Program and timing','GPIO y botones':'GPIO and buttons',
+  'ADC, PWM y RGB':'ADC, PWM and RGB','I²C y SPI':'I²C and SPI',
+  'USB y UART':'USB and UART','Wi-Fi y HTTP':'Wi-Fi and HTTP',
+  'Bluetooth LE':'Bluetooth LE','ESP-NOW':'ESP-NOW','Archivos y NVS':'Files and NVS',
+  'Control':'Control','Lógica':'Logic','Matemáticas':'Math','Texto':'Text',
+  'Python avanzado':'Advanced Python','Variables':'Variables','Funciones':'Functions'
+};
+function localizedToolbox() {
+  const tree=JSON.parse(JSON.stringify(BLOCK_TOOLBOX));
+  if (settings.language==='en') tree.contents.forEach(cat=>{cat.name=TOOLBOX_EN[cat.name]||cat.name;});
+  return tree;
+}
+
+async function refreshBlocklyLanguage() {
+  if (!window.Blockly || !window.python) return;
+  const B=window.Blockly;
+  const saved=visualWorkspace?B.serialization.workspaces.save(visualWorkspace):null;
+  await loadBlocksScript('msg/'+settings.language+'.js');
+  B.setLocale(B.Msg);
+  if (visualWorkspace) visualWorkspace.clear();
+  for (const type of [...Object.keys(BLOCK_LABEL_EN),'mp_python_raw']) delete B.Blocks[type];
+  registerMicroPythonBlocks(B,window.python);
+  if (visualWorkspace) {
+    B.Events.disable();
+    try {B.serialization.workspaces.load(saved,visualWorkspace);}
+    finally {B.Events.enable();}
+    visualWorkspace.updateToolbox(localizedToolbox());
+    updateBlockPreview();
+    B.svgResize(visualWorkspace);
+  }
+}
+
+// Los ejemplos son proyectos Blockly editables, no trozos de Python precargados.
+const BLOCK_PRESETS = {
+  blink:[{type:'mp_blink'}],
+  button:[{type:'mp_gpio_watch',fields:{PIN:4,SECONDS:10},
+    body:[{type:'mp_pin_toggle',fields:{PIN:8}}]}],
+  pwm:[{type:'mp_pwm_start',fields:{PIN:10,DUTY:20000}},
+       {type:'mp_sleep_ms',fields:{MS:1500}},
+       {type:'mp_pwm_duty',fields:{PIN:10},inputs:{DUTY:{type:'math_number',fields:{NUM:50000}}}},
+       {type:'mp_sleep_ms',fields:{MS:1500}},
+       {type:'mp_pwm_stop',fields:{PIN:10}}],
+  adc:[{type:'mp_adc_monitor',fields:{PIN:0,COUNT:10,MS:500}}],
+  i2c:[{type:'mp_i2c_scan'}],
+  spi:[{type:'mp_spi_xfer'}],
+  uart:[{type:'mp_uart_send'}],
+  ap:[{type:'mp_wifi_ap'}],
+  'sta-rssi':[{type:'mp_wifi_sta'},{type:'mp_wifi_rssi'}],
+  scan:[{type:'mp_wifi_scan'}],
+  http:[{type:'mp_wifi_sta'},{type:'mp_http_get'}],
+  'ble-beacon':[{type:'mp_ble_advertise'}],
+  'ble-scan':[{type:'mp_ble_scan'}],
+  'ble-led':[{type:'mp_ble_gatt_led'}],
+  'now-send':[{type:'mp_now_start'},{type:'mp_now_send'}],
+  'now-recv':[{type:'mp_now_start'},{type:'mp_now_recv'}],
+  neopixel:[{type:'mp_rgb_set'}],
+  nvs:[{type:'mp_nvs_set'},{type:'mp_nvs_get'}],
+  files:[{type:'mp_file_write'},{type:'mp_file_read'}],
+  'usb-hello':[{type:'mp_usb_print',inputs:{TEXT:{type:'text',fields:{TEXT:'Hola desde la consola USB'}}}}],
+  'local-math':[{type:'text_print',inputs:{TEXT:{type:'math_arithmetic',fields:{OP:'ADD'},
+    inputs:{A:{type:'math_number',fields:{NUM:21}},B:{type:'math_number',fields:{NUM:21}}}}}}],
+  'adc-alarm':[{type:'mp_adc_alarm'}],
+  'ap-http':[{type:'mp_wifi_ap',fields:{SSID:'C3-Servidor',KEY:'ClaveDemo123'}},
+             {type:'mp_http_server',fields:{PORT:8080,REPLY:'Hola desde mi C3',COUNT:3}},
+             {type:'mp_wifi_ap_stop'}],
+  'wifi-off':[{type:'mp_wifi_ap'},{type:'mp_sleep_ms',fields:{MS:3000}},
+              {type:'mp_wifi_ap_stop'}],
+  'file-log':[{type:'mp_file_write',fields:{PATH:'registro.txt',TEXT:'Muestra de prueba\n',MODE:'a'}},
+              {type:'mp_file_read',fields:{PATH:'registro.txt'}},{type:'mp_file_list'}],
+  'system-check':[{type:'mp_board_info'},{type:'mp_file_list'},{type:'mp_wifi_info'}],
+  'light-sleep':[{type:'mp_usb_print',inputs:{TEXT:{type:'text',fields:{TEXT:'Reposo ligero 2 s'}}}},
+                 {type:'mp_lightsleep',fields:{MS:2000}},
+                 {type:'mp_usb_print',inputs:{TEXT:{type:'text',fields:{TEXT:'Desperté'}}}}],
+  'deep-sleep':[{type:'mp_deepsleep',fields:{MS:10000}}],
+  'ble-stop':[{type:'mp_ble_advertise',fields:{NAME:'C3-Demo-BLE'}},
+              {type:'mp_sleep_ms',fields:{MS:5000}},{type:'mp_ble_stop'}],
+  'now-monitor':[{type:'mp_now_start'},{type:'mp_now_recv',fields:{COUNT:3,TIMEOUT:1000}},
+                 {type:'mp_now_stop'}],
+  'rgb-sequence':[{type:'mp_rgb_set',fields:{PIN:10,R:255,G:0,B:0}},
+                  {type:'mp_sleep_ms',fields:{MS:500}},
+                  {type:'mp_rgb_set',fields:{PIN:10,R:0,G:255,B:0}},
+                  {type:'mp_sleep_ms',fields:{MS:500}},
+                  {type:'mp_rgb_set',fields:{PIN:10,R:0,G:0,B:0}}],
+  'code-hello':[{type:'text_print',inputs:{TEXT:{type:'text',fields:{TEXT:'Hola mundo'}}}}],
+  'code-portal':[{type:'mp_captive_demo'}],
+  'code-ap':[{type:'mp_wifi_ap',fields:{SSID:'ESP32-C3-Aula',KEY:'CambiaEstaClave123'}}],
+  'code-sta':[{type:'mp_wifi_sta'},{type:'mp_wifi_info'}],
+  'code-scan':[{type:'mp_wifi_scan'}],
+  'code-rssi':[{type:'mp_wifi_sta'},{type:'mp_wifi_rssi'}],
+  'code-diag':[{type:'mp_board_info'},{type:'mp_wifi_info'}],
+  'code-led':[{type:'mp_blink',fields:{PIN:8,TIMES:5,MS:400,ACTIVE:'0'}}],
+  'code-uart':[{type:'mp_uart_send',fields:{TX:4,RX:5,BAUD:115200,MESSAGE:'PING'}},
+               {type:'mp_uart_recv',fields:{TX:4,RX:5,BAUD:115200,TIMEOUT:5000}}]
+};
+
+const EXAMPLE_GUIDES = {
+  blink:{title:'Parpadeo del LED',en:'Blink the LED',description:'Enciende y apaga cinco veces el LED integrado de muchas C3 Super Mini.',enDescription:'Blink the built-in LED on many C3 Super Mini boards five times.',steps:['GPIO8 suele llevar un LED activo en bajo: 0 enciende y 1 apaga.','La pausa de 500 ms permite ver cada cambio.'],enSteps:['GPIO8 often drives an active-low LED: 0 turns it on.','A 500 ms pause makes each change visible.'],icon:'lightbulb'},
+  button:{title:'Botón y LED',en:'Button and LED',description:'Vigila GPIO4 con pull-up y cambia el LED al detectar cambios.',enDescription:'Watch GPIO4 with pull-up and toggle the LED on changes.',steps:['Conecta el botón entre GPIO4 y GND.','La lectura periódica detecta cambios y conmuta GPIO8.'],enSteps:['Connect the button between GPIO4 and GND.','Polling detects changes and toggles GPIO8.'],icon:'toggle-left'},
+  pwm:{title:'PWM y brillo',en:'PWM brightness',description:'Inicia PWM en GPIO10, cambia su ciclo de trabajo y lo detiene.',enDescription:'Start PWM on GPIO10, change duty cycle and stop it.',steps:['Conecta un LED externo con resistencia a GPIO10.','Inicia PWM a 1 kHz.','Espera, aumenta brillo, espera y libera el pin.'],enSteps:['Connect an external LED with a resistor to GPIO10.','Start PWM at 1 kHz.','Wait, increase brightness, wait, release the pin.'],icon:'sun'},
+  adc:{title:'Sensor analógico',en:'Analog sensor',description:'Lee diez muestras ADC de GPIO0 entre 0 y 65535.',enDescription:'Read ten ADC samples from GPIO0, scaled 0 to 65535.',steps:['Conecta un sensor que no supere 3,3 V a GPIO0.','La lectura de 16 bits se muestra cada 500 ms.'],enSteps:['Connect a sensor no higher than 3.3 V to GPIO0.','A 16-bit reading is printed every 500 ms.'],icon:'activity'},
+  i2c:{title:'Escáner I²C',en:'I²C scanner',description:'Busca direcciones de sensores I²C con SDA GPIO4 y SCL GPIO5.',enDescription:'Find I²C sensor addresses using SDA GPIO4 and SCL GPIO5.',steps:['Conecta SDA, SCL, GND y alimentación apropiada.','El bus escanea y muestra las direcciones hexadecimales.'],enSteps:['Wire SDA, SCL, GND and suitable power.','Scan the bus and print hexadecimal addresses.'],icon:'scan-search'},
+  spi:{title:'Intercambio SPI',en:'SPI transfer',description:'Envía 9F000000 por SoftSPI y muestra los bytes recibidos.',enDescription:'Send 9F000000 via SoftSPI and print received bytes.',steps:['Conecta SCK4, MOSI6, MISO7 y CS5 al periférico.','CS baja, se intercambian bytes y vuelve a subir.'],enSteps:['Wire SCK4, MOSI6, MISO7 and CS5 to the device.','CS goes low, bytes are exchanged, then CS returns high.'],icon:'circuit-board'},
+  uart:{title:'Enviar por UART',en:'Send over UART',description:'Envía una línea por UART1: TX GPIO4, RX GPIO5.',enDescription:'Send a line over UART1: TX GPIO4, RX GPIO5.',steps:['Cruza TX con RX del otro dispositivo y une GND.','Envía texto con salto de línea y libera el UART.'],enSteps:['Cross TX to the other device RX and share GND.','Send text plus newline and release UART.'],icon:'cable'},
+  ap:{title:'Punto de acceso AP',en:'Wi-Fi access point',description:'Crea una red propia con SSID y clave; muestra IP y canal.',enDescription:'Create a network with SSID and password; print IP and channel.',steps:['Cambia SSID y clave WPA2 de al menos 8 caracteres.','Activa AP y muestra datos de la nueva red.'],enSteps:['Change SSID and WPA2 password (at least 8 characters).','Enable AP and print its network details.'],icon:'radio-tower'},
+  'sta-rssi':{title:'STA y RSSI',en:'STA and RSSI',description:'Conecta a una red con espera limitada y mide diez RSSI en dBm.',enDescription:'Connect with a timeout and sample ten RSSI values in dBm.',steps:['Escribe el SSID y la clave de tu red Wi-Fi.','Activa STA y espera hasta 15 segundos.','Solo si la conexión sigue activa consulta status("rssi") diez veces.'],enSteps:['Enter your Wi-Fi SSID and password.','Enable STA and wait up to 15 seconds.','While connected, sample status("rssi") ten times.'],icon:'wifi'},
+  scan:{title:'Escanear Wi-Fi',en:'Scan Wi-Fi',description:'Muestra SSID, canal y RSSI de las redes visibles.',enDescription:'Print SSID, channel and RSSI for visible networks.',steps:['Activa STA para habilitar la radio.','Escanea y decodifica los SSID encontrados.'],enSteps:['Enable STA to power the radio.','Scan and decode discovered SSIDs.'],icon:'scan-search'},
+  http:{title:'Consulta HTTP',en:'HTTP request',description:'Conecta STA y hace una consulta HTTP simple sin TLS.',enDescription:'Connect STA and perform a plain HTTP request without TLS.',steps:['Configura tu red y conecta STA.','Consulta el host por puerto 80; requiere Internet.'],enSteps:['Configure the Wi-Fi network and connect STA.','Request the host on port 80; Internet is required.'],icon:'globe'},
+  'ble-beacon':{title:'Baliza BLE',en:'BLE beacon',description:'Anuncia el nombre de la C3 por Bluetooth Low Energy.',enDescription:'Advertise the C3 name over Bluetooth Low Energy.',steps:['Activa el controlador BLE.','Publica el nombre visible en un escáner BLE.'],enSteps:['Enable BLE.','Advertise a name visible to a BLE scanner.'],icon:'bluetooth'},
+  'ble-scan':{title:'Escáner BLE',en:'BLE scanner',description:'Escanea cinco segundos y lista MAC y RSSI BLE.',enDescription:'Scan for five seconds and list BLE MAC addresses and RSSI.',steps:['Recoge anuncios BLE por IRQ durante cinco segundos.','Muestra dispositivos únicos y la intensidad de su señal.'],enSteps:['Collect BLE advertisements by IRQ for five seconds.','Print unique devices and their signal strengths.'],icon:'radar'},
+  'ble-led':{title:'LED por BLE GATT',en:'LED over BLE GATT',description:'Controla GPIO8 con un cliente BLE que escriba 1/ON o 0/OFF.',enDescription:'Control GPIO8 from a BLE client writing 1/ON or 0/OFF.',steps:['Instala servicio FFF0 y característica escribible FFF1.','El cliente BLE cambia el LED al escribir un valor.'],enSteps:['Register service FFF0 and writable characteristic FFF1.','A BLE client changes the LED by writing a value.'],icon:'bluetooth'},
+  'now-send':{title:'ESP-NOW emisor',en:'ESP-NOW sender',description:'Registra una MAC de par y envía un mensaje sin router.',enDescription:'Register a peer MAC and send a message without a router.',steps:['Activa STA y ESP-NOW; ambas placas deben usar el mismo canal.','Cambia la MAC de difusión por la del receptor cuando corresponda.'],enSteps:['Enable STA and ESP-NOW; both boards need the same channel.','Set the receiver MAC as needed.'],icon:'send'},
+  'now-recv':{title:'ESP-NOW receptor',en:'ESP-NOW receiver',description:'Recibe hasta cinco mensajes ESP-NOW con espera limitada.',enDescription:'Receive up to five ESP-NOW messages with a timeout.',steps:['Activa STA y ESP-NOW en el canal acordado.','Escucha hasta cinco veces y muestra mensajes y remitente.'],enSteps:['Enable STA and ESP-NOW on the shared channel.','Listen five times and print messages and senders.'],icon:'inbox'},
+  neopixel:{title:'LED RGB externo',en:'External RGB LED',description:'Pone un color en un WS2812 externo conectado a GPIO10.',enDescription:'Set a color on an external WS2812 on GPIO10.',steps:['Usa alimentación y masa adecuadas para el LED.','Define R, G y B, después actualiza la tira.'],enSteps:['Provide suitable power and common ground.','Set R, G and B, then update the strip.'],icon:'palette'},
+  nvs:{title:'Memoria NVS',en:'NVS storage',description:'Guarda y lee un entero persistente en NVS.',enDescription:'Store and read a persistent integer in NVS.',steps:['Escribe un entero bajo un espacio y una clave.','Confirma los cambios y lee la misma clave.'],enSteps:['Write an integer under a namespace and key.','Commit changes and read the same key.'],icon:'database'},
+  files:{title:'Archivo en flash',en:'Flash file',description:'Escribe y luego lee datos.txt en la flash de la placa.',enDescription:'Write and then read datos.txt in board flash.',steps:['Crea o reemplaza el archivo con texto.','Abre el archivo y muestra su contenido.'],enSteps:['Create or replace the file with text.','Open the file and print its content.'],icon:'file-text'},
+  'usb-hello':{title:'Hola por USB/REPL',en:'Hello over USB/REPL',description:'Muestra texto por la consola USB serial.',enDescription:'Print text over USB serial.',steps:['El bloque recibe un valor de Texto conectado al hueco.','Con placa se ve en Salida; sin placa se puede ejecutar localmente.'],enSteps:['Connect a Text value in the socket.','Output goes to the board or local runner.'],icon:'terminal'},
+  'local-math':{title:'Matemáticas sin placa',en:'Math without a board',description:'Suma dos valores con bloques redondos y muestra 42 en el navegador.',enDescription:'Add two number blocks and print 42 in the browser.',steps:['Encaja números en el bloque Suma.','Coloca el resultado dentro de imprimir y pulsa Ejecutar local.'],enSteps:['Put numbers in the addition block.','Connect the result to print, then Run locally.'],icon:'calculator'},
+  'adc-alarm':{title:'Alarma de sensor ADC',en:'ADC sensor alarm',description:'Lee GPIO0 y conmuta un LED al superar el umbral en 20 muestras.',enDescription:'Sample GPIO0 and switch an LED on above a threshold.',steps:['Conecta un sensor de 0–3,3 V a GPIO0 y GND.','Ajusta umbral y pin LED; la salida se apaga al terminar.'],enSteps:['Connect a 0–3.3 V sensor to GPIO0 and GND.','Set threshold and LED pin; output turns off at the end.'],icon:'siren'},
+  'ap-http':{title:'Servidor web local',en:'Local web server',description:'Crea un AP y sirve tres respuestas HTTP en el puerto 8080; después cierra el AP.',enDescription:'Create an AP and serve three HTTP responses on port 8080; then close the AP.',steps:['Cambia SSID y clave de la red de prueba.','Conecta un teléfono y abre http://192.168.4.1:8080.','Tras tres solicitudes o el límite de espera, apaga el AP.'],enSteps:['Change SSID and password.','Join with a phone and visit http://192.168.4.1:8080.','After three requests or timeout, close the AP.'],icon:'server'},
+  'wifi-off':{title:'AP temporal',en:'Temporary AP',description:'Enciende un punto de acceso durante tres segundos y lo apaga.',enDescription:'Enable an access point for three seconds, then turn it off.',steps:['Configura un SSID y clave propios.','Observa en la consola la red y su cierre.'],enSteps:['Set your own SSID and password.','Watch the network start and stop in the console.'],icon:'wifi-off'},
+  'file-log':{title:'Registro en flash',en:'Flash log',description:'Añade texto a registro.txt, lo lee y lista archivos.',enDescription:'Append to registro.txt, read it and list files.',steps:['El modo agregar conserva contenido anterior.','Cada ejecución escribe en flash; evita ciclos de escritura intensiva.'],enSteps:['Append mode keeps previous content.','Each run writes flash; avoid high-frequency writes.'],icon:'notebook-pen'},
+  'system-check':{title:'Inventario del sistema',en:'System inventory',description:'Muestra firmware, memoria, ficheros y estado Wi-Fi.',enDescription:'Show firmware, memory, files and Wi-Fi status.',steps:['Lee datos del sistema y del espacio de archivos.','Consulta Wi-Fi sin conectarse a otra red.'],enSteps:['Read board and file-system data.','Inspect Wi-Fi without joining another network.'],icon:'clipboard-list'},
+  'light-sleep':{title:'Reposo ligero',en:'Light sleep',description:'Duerme dos segundos y continúa por la consola.',enDescription:'Sleep for two seconds, then continue printing.',steps:['Muestra aviso antes de dormir.','Despierta, recupera el hilo y escribe un mensaje.'],enSteps:['Print before sleeping.','Wake and print after sleep.'],icon:'moon'},
+  'deep-sleep':{title:'Reposo profundo',en:'Deep sleep',description:'Duerme diez segundos y reinicia al despertar.',enDescription:'Sleep ten seconds and reboot upon waking.',steps:['Guarda el trabajo antes de ejecutar.','Tras diez segundos la placa reinicia; main.py volvería a comenzar.'],enSteps:['Save your work first.','The board restarts after ten seconds; main.py would run again.'],warning:'El USB se desconecta y la placa reinicia. No guardes este ejemplo como main.py sin planificar cómo detener el ciclo.',enWarning:'USB disconnects and the board reboots. Do not save this as main.py without a recovery plan.',icon:'power'},
+  'ble-stop':{title:'Baliza BLE temporal',en:'Temporary BLE beacon',description:'Anuncia BLE cinco segundos y desactiva la radio.',enDescription:'Advertise over BLE for five seconds, then turn the radio off.',steps:['Activa BLE y anuncia un nombre propio.','Espera cinco segundos y desactiva BLE.'],enSteps:['Start BLE and advertise your own name.','Wait five seconds and switch BLE off.'],icon:'bluetooth'},
+  'now-monitor':{title:'Monitor ESP-NOW corto',en:'Short ESP-NOW monitor',description:'Recibe hasta tres mensajes y cierra ESP-NOW.',enDescription:'Receive up to three messages and stop ESP-NOW.',steps:['Usa el mismo canal en ambas placas.','Espera tres mensajes con timeout de un segundo por intento.'],enSteps:['Use the same channel on both boards.','Wait for three messages with a one-second timeout each.'],icon:'radio'},
+  'rgb-sequence':{title:'Secuencia NeoPixel',en:'NeoPixel sequence',description:'Muestra rojo, verde y apagado en un WS2812 externo GPIO10.',enDescription:'Show red, green and off on an external WS2812 at GPIO10.',steps:['Conecta LED, GND y alimentación adecuada.','Cada bloque cambia color; espera 500 ms entre estados.'],enSteps:['Connect LED, ground and suitable power.','Each block changes color with a 500 ms pause.'],icon:'palette'}
+};
+
+function createBlockPreset(name, workspace=visualWorkspace) {
+  const specs = BLOCK_PRESETS[name];
+  if (!specs) throw new Error('Ejemplo visual desconocido: ' + name);
+  const guide=EXAMPLE_GUIDES[name] || (name.startsWith('code-')?
+    EXAMPLES.find(item=>item.id===name.slice(5)):null);
+  const B = window.Blockly;
+  B.Events.disable();
+  try {
+    workspace.clear();
+    const make = (spec, x, y, note='') => {
+      const block = workspace.newBlock(spec.type);
+      Object.entries(spec.fields || {}).forEach(([field, val]) =>
+        block.setFieldValue(String(val), field));
+      if (block.initSvg) { block.initSvg(); block.render(); block.moveBy(x, y); }
+      if (note && block.setCommentText) block.setCommentText(note);
+      for (const [inputName, childSpec] of Object.entries(spec.inputs || {})) {
+        const child=make(childSpec,x+230,y+36);
+        block.getInput(inputName).connection.connect(child.outputConnection);
+      }
+      let prev = null, bodyIndex=0;
+      for (const item of spec.body || []) {
+        const child=make(item,x+120,y+75,
+          (guide?.steps||[])[++bodyIndex]||'');
+        if (prev) prev.nextConnection.connect(child.previousConnection);
+        else block.getInput('DO').connection.connect(child.previousConnection);
+        prev=child;
+      }
+      return block;
+    };
+    let previous=null;
+    specs.forEach((spec,index) => {
+      const current=make(spec,42,42+index*95,
+        (guide?.steps || [])[index] || 'Paso '+(index+1));
+      if (previous) previous.nextConnection.connect(current.previousConnection);
+      previous=current;
+    });
+  } finally { B.Events.enable(); }
+  if (workspace===visualWorkspace) { updateBlockPreview(); B.svgResize(visualWorkspace); }
+}
+
+const BLOCK_PIN_FIELDS = ['PIN','LED','SDA','SCL','SCK','MOSI','MISO','CS','TX','RX'];
+function validateBlockProject() {
+  if (!visualWorkspace) return {errors:[],warnings:[]};
+  const errors=[], warnings=[], blocks=visualWorkspace.getAllBlocks(false);
+  const c3=$('#blockBoard').value==='c3';
+  const types=new Set(blocks.map(b=>b.type));
+  for (const block of blocks) {
+    if (block.isEnabled && !block.isEnabled()) continue;
+    for (const field of BLOCK_PIN_FIELDS) {
+      const pin=block.getFieldValue(field);
+      if (pin===null || pin===undefined || !c3) continue;
+      const number=Number(pin);
+      if (number>21 || number<0) errors.push('GPIO' + pin + ' fuera del rango ESP32-C3 (0–21).');
+      else if (number>=12 && number<=17) errors.push('GPIO' + pin + ' reservado para la flash del C3.');
+      else if (number===18 || number===19) errors.push('GPIO' + pin + ' reservado para USB Serial/JTAG.');
+      else if ([2,8,9].includes(number)) warnings.push('GPIO' + pin + ' afecta el arranque; verifica el esquema de tu placa.');
+      if (field==='PIN' && /^mp_adc_/.test(block.type) && number>4)
+        errors.push('ADC seguro en C3: utiliza GPIO0–4.');
+    }
+    if (['mp_wifi_ap','mp_captive_demo'].includes(block.type) &&
+        String(block.getFieldValue('KEY')).length<8)
+      errors.push('La clave del AP debe contener al menos 8 caracteres.');
+    if (block.type==='mp_captive_demo') warnings.push('Portal local educativo: solo en red propia y con consentimiento; no uses SSID de terceros.');
+    if (block.type==='mp_now_peer' || block.type==='mp_now_send') {
+      const mac=String(block.getFieldValue('MAC')).replace(/[:-]/g,'');
+      if (!/^[0-9a-fA-F]{12}$/.test(mac)) errors.push('MAC ESP-NOW inválida: usa 6 bytes hexadecimales.');
+    }
+    if (block.type==='mp_spi_xfer' &&
+        !/^(?:[0-9a-fA-F]{2})+$/.test(String(block.getFieldValue('HEX'))))
+      errors.push('SPI requiere una secuencia HEX par, por ejemplo 9F000000.');
+    if (block.type==='mp_i2c_read' || block.type==='mp_i2c_write') {
+      for (const field of ['ADDR','REG', ...(block.type==='mp_i2c_write'?['DATA']:[])]) {
+        if (!/^[0-9a-fA-F]{1,2}$/.test(String(block.getFieldValue(field))))
+          errors.push('I²C: ' + field + ' debe contener 1–2 dígitos HEX.');
+      }
+    }
+    if (block.type==='mp_rgb_set' &&
+        Number(block.getFieldValue('INDEX'))>=Number(block.getFieldValue('COUNT')))
+      errors.push('NeoPixel: índice fuera de la cantidad de LED indicada.');
+    if (block.type==='mp_deepsleep') warnings.push('El reposo profundo desconecta el puerto y reinicia al despertar.');
+    if (block.type==='mp_wdt_start') warnings.push('El watchdog permanece activo hasta reiniciar; aliméntalo periódicamente.');
+    if (block.type==='mp_http_get') warnings.push('El bloque HTTP GET usa texto sin TLS; conecta la placa por STA.');
+    if (block.type==='mp_now_start' || block.type==='mp_now_send' ||
+        block.type==='mp_now_recv' || block.type==='mp_now_on_message')
+      warnings.push('ESP-NOW: ambos equipos deben compartir canal Wi-Fi.');
+  }
+  if (blocks.some(b=>b.outputConnection && !b.outputConnection.isConnected()))
+    warnings.push('Hay bloques de valor sueltos: encájalos en un hueco compatible para usarlos.');
+  if (visualWorkspace.getTopBlocks(false).filter(b=>b.previousConnection||b.nextConnection).length>1)
+    warnings.push('Une las instrucciones para definir claramente su orden de ejecución.');
+  if (types.has('mp_ble_scan') && types.has('mp_ble_gatt_led'))
+    warnings.push('BLE escáner y GATT instalan manejadores IRQ diferentes; ejecútalos por separado.');
+  return {errors:[...new Set(errors)], warnings:[...new Set(warnings)]};
+}
+
+function blockPython() {
+  if (!visualWorkspace || !visualWorkspace.getAllBlocks(false).length) {
+    throw new Error('Añade al menos un bloque antes de generar el programa.');
+  }
+  const code = window.python.pythonGenerator.workspaceToCode(visualWorkspace);
+  if (!code.trim()) throw new Error('No hay bloques que generen instrucciones.');
+  return code;
+}
+
+function updateBlockPreview() {
+  if (!visualWorkspace) return;
+  const label=$('#blocklyMessage');
+  label.dataset.level='';
+  try {
+    const code=blockPython();
+    const validation=validateBlockProject();
+    $('#blocklyCode').textContent=code;
+    $('#blockCodeSize').textContent=code.trimEnd().split('\n').length + ' líneas';
+    if (validation.errors.length) {
+      label.dataset.level='error';
+      label.textContent=validation.errors.join(' · ');
+    } else if (validation.warnings.length) {
+      label.dataset.level='warn';
+      label.textContent=validation.warnings.join(' · ');
+    } else {
+      label.textContent='Proyecto guardado en este navegador. Las claves Wi-Fi también quedan almacenadas localmente.';
+    }
+  } catch (err) {
+    $('#blocklyCode').textContent='# Arrastra bloques desde la caja de herramientas.';
+    $('#blockCodeSize').textContent='0 líneas';
+    label.textContent=err.message;
+  }
+  try {
+    const data=window.Blockly.serialization.workspaces.save(visualWorkspace);
+    const doc=activeDoc();
+    if (doc) doc.blockState=data;
+    localStorage.setItem(BLOCKS_STORAGE_KEY,JSON.stringify(data));
+  } catch (err) {
+    label.dataset.level='warn';
+    label.textContent='No se pudo guardar el proyecto local: ' + err.message;
+  }
+}
+
+function loadVisualProject(data) {
+  const B=window.Blockly;
+  B.Events.disable();
+  try {
+    visualWorkspace.clear();
+    B.serialization.workspaces.load(data,visualWorkspace);
+  } finally { B.Events.enable(); }
+  updateBlockPreview();
+  B.svgResize(visualWorkspace);
+}
+
+function makeBlockThemes(B) {
+  if (blockThemes) return blockThemes;
+  const dark=B.Theme.defineTheme('espwebstudio_dark', {
+    base:B.Themes.Zelos,
+    componentStyles:{
+      workspaceBackgroundColour:'#0d1522',
+      toolboxBackgroundColour:'#172033',
+      toolboxForegroundColour:'#eef4ff',
+      flyoutBackgroundColour:'#202b40',
+      flyoutForegroundColour:'#eef4ff',
+      flyoutOpacity:1,
+      scrollbarColour:'#64748b',
+      scrollbarOpacity:.55,
+      insertionMarkerColour:'#fbbf24',
+      insertionMarkerOpacity:.45,
+      markerColour:'#60a5fa',
+      cursorColour:'#93c5fd'
+    }
+  });
+  blockThemes={dark,light:B.Themes.Zelos};
+  return blockThemes;
+}
+function updateBlockTheme(theme) {
+  if (!visualWorkspace) return;
+  const styles=makeBlockThemes(window.Blockly);
+  visualWorkspace.setTheme(styles[theme] || styles.light);
+  window.Blockly.svgResize(visualWorkspace);
+}
+window.updateBlockTheme=updateBlockTheme;
+
+async function ensureBlocklyRuntime() {
+  if (!blocksRuntimeLoader) blocksRuntimeLoader=(async()=>{
+    if (!window.Blockly) await loadBlocksScript('blockly_compressed.js');
+    await loadBlocksScript('msg/'+(settings.language==='en'?'en':'es')+'.js');
+    await loadBlocksScript('blocks_compressed.js');
+    if (!window.python) await loadBlocksScript('python_compressed.js');
+    registerMicroPythonBlocks(window.Blockly,window.python);
+  })().catch(err=>{blocksRuntimeLoader=null;throw err;});
+  return blocksRuntimeLoader;
+}
+async function loadBlockEditor() {
+  if (visualWorkspace) { window.Blockly.svgResize(visualWorkspace); return; }
+  if (!blocksLoader) {
+    blocksLoader=(async () => {
+      await ensureBlocklyRuntime();
+      visualWorkspace=window.Blockly.inject('blocklyWorkspace',{
+        toolbox:localizedToolbox(),
+        media:BLOCKS_CDN+'media/',
+        theme:makeBlockThemes(window.Blockly)[settings.theme],
+        trashcan:true,
+        zoom:{controls:true,wheel:true,startScale:.9,maxScale:2,minScale:.4},
+        move:{scrollbars:true,drag:true,wheel:false}
+      });
+      visualWorkspace.addChangeListener(event => {
+        if (event.isUiEvent) { updateBlockGuidance(); return; }
+        const doc=activeDoc();
+        if (doc && visualDocId===doc.id) {doc.dirty=true;renderTabs();}
+        clearTimeout(blocksTimer);
+        blocksTimer=setTimeout(updateBlockPreview,160);
+      });
+      window.Blockly.svgResize(visualWorkspace);
+    })().catch(err => {blocksLoader=null; throw err;});
+  }
+  return blocksLoader;
+}
+
+function updateBlockGuidance() {
+  const b=window.Blockly?.getSelected?.();
+  const guide=$('#blockGuideText');
+  $('#btnEditRaw').disabled=b?.type!=='mp_python_raw';
+  if (!b || !b.type) { guide.textContent=ui('connectionGuide'); return; }
+  const kind=b.outputConnection ?
+    (settings.language==='en'?'Value block: insert it into a matching socket.':'Bloque de valor: colócalo en un hueco compatible.') :
+    (settings.language==='en'?'Statement block: snap it above or below another.':'Bloque de instrucción: encájalo encima o debajo de otro.');
+  const tooltip=b.getTooltip?.() || '';
+  guide.textContent=kind+' '+tooltip;
+}
+
+function setRawSource(block,source) {
+  block.data=source;
+  const first=(source.trim().split('\n').find(s=>s.trim())||'Python vacío').trim();
+  block.setFieldValue(first.slice(0,55)+(first.length>55?'…':''),'SUMMARY');
+}
+$('#btnEditRaw').addEventListener('click',()=>{
+  const block=window.Blockly?.getSelected?.();
+  if (block?.type!=='mp_python_raw') return;
+  $('#rawEditorText').value=block.data||'';
+  $('#rawEditorOverlay').dataset.blockId=block.id;
+  openOverlay('rawEditorOverlay');
+  $('#rawEditorText').focus();
+});
+$('#btnRawApply').addEventListener('click',()=>{
+  const block=visualWorkspace?.getBlockById($('#rawEditorOverlay').dataset.blockId);
+  if (!block || block.type!=='mp_python_raw') return;
+  setRawSource(block,$('#rawEditorText').value);
+  updateBlockPreview();
+  closeOverlay('rawEditorOverlay');
+});
+
+// Recognize a single field edit in Python generated from existing blocks.
+// Accept it only when regenerating the entire program reproduces the source byte for byte.
+function reconcileCodeExampleEdit(doc,source) {
+  const id=doc.exampleGuide?.id;
+  if (!['ap','sta','rssi'].includes(id) || !doc.blockState || !doc.blockSource) return null;
+  const old=doc.blockSource;
+  let start=0,end=0;
+  while (start<old.length && start<source.length && old[start]===source[start]) start++;
+  while (end<old.length-start && end<source.length-start &&
+    old[old.length-1-end]===source[source.length-1-end]) end++;
+  const before=old.slice(0,start).split('\n').at(-1);
+  const removed=old.slice(start,old.length-end),inserted=source.slice(start,source.length-end);
+  if (!removed || removed.length>100 || inserted.length>100 || /[\n"']/.test(removed+inserted)) return null;
+  let field=null;
+  if (id==='ap' && /^ap\.config\(/.test(before.trim()))
+    field=before.includes('key=')?'KEY':before.includes('ssid=')?'SSID':null;
+  if (id==='sta' || id==='rssi') {
+    if (/^SSID\s*=\s*"/.test(before.trim())) field='SSID';
+    if (/^CLAVE\s*=\s*"/.test(before.trim())) field='KEY';
+  }
+  if (!field) return null;
+  const B=window.Blockly,ws=new B.Workspace();
+  try {
+    B.serialization.workspaces.load(doc.blockState,ws);
+    const block=ws.getAllBlocks(false).find(b=>b.type==='mp_wifi_'+(id==='ap'?'ap':'sta'));
+    if (!block) return null;
+    const previous=String(block.getFieldValue(field));
+    if (!previous.includes(removed)) return null;
+    block.setFieldValue(previous.replace(removed,inserted),field);
+    return B.serialization.workspaces.save(ws);
+  } finally {ws.dispose();}
+}
+function reconcileGeneratedEdit(doc,source) {
+  if (!doc.blockState || !doc.blockSource) return null;
+  const old=doc.blockSource;
+  let start=0;
+  while (start<old.length && start<source.length && old[start]===source[start]) start++;
+  let end=0;
+  while (end<old.length-start && end<source.length-start &&
+    old[old.length-1-end]===source[source.length-1-end]) end++;
+  const removed=old.slice(start,old.length-end),inserted=source.slice(start,source.length-end);
+  if (!removed || removed.length>120 || inserted.length>120) return null;
+  const B=window.Blockly,ws=new B.Workspace();
+  try {
+    B.serialization.workspaces.load(doc.blockState,ws);
+    for (const block of ws.getAllBlocks(false)) for (const input of block.inputList) {
+      for (const field of input.fieldRow) {
+        if (!field.name || field.getValue()==null) continue;
+        const previous=String(field.getValue());
+        if (!previous.includes(removed)) continue;
+        const candidate=previous.replace(removed,inserted);
+        try {block.setFieldValue(candidate,field.name);} catch {continue;}
+        const code=window.python.pythonGenerator.workspaceToCode(ws);
+        const regenerated=doc.exampleGuide?commentedExample(doc.exampleGuide,code):code;
+        if (regenerated===source) return B.serialization.workspaces.save(ws);
+        block.setFieldValue(previous,field.name);
+      }
+    }
+    return null;
+  } finally {ws.dispose();}
+}
+
+function pythonToVisual(source) {
+  const B=window.Blockly;
+  B.Events.disable();
+  try {
+    visualWorkspace.clear();
+    if (!source.trim()) return 'empty';
+    const lines=source.replace(/\r\n/g,'\n').split('\n');
+    const specs=[];
+    let note='';
+    for (const line of lines) {
+      const s=line.trim();
+      if (!s) continue;
+      if (s.startsWith('#')) { note+=(note?'\n':'')+s.slice(1).trim(); continue; }
+      if (/^(?:import time|from machine import Pin)$/.test(s)) continue;
+      let m;
+      if ((m=/^time\.sleep_ms\((\d+)\)$/.exec(s))) specs.push({type:'mp_sleep_ms',fields:{MS:m[1]},note});
+      else if ((m=/^Pin\((\d+),\s*Pin\.OUT\)\.value\(([01])\)$/.exec(s))) specs.push({type:'mp_pin_write',fields:{PIN:m[1],LEVEL:m[2]},note});
+      else if ((m=/^print\(("(?:[^"\\]|\\.)*")\)$/.exec(s))) {
+        specs.push({type:'text_print',inputs:{TEXT:{type:'text',fields:{TEXT:JSON.parse(m[1])}}},note});
+      } else { specs.length=0; break; }
+      note='';
+    }
+    if (!specs.length || note) {
+      const raw=visualWorkspace.newBlock('mp_python_raw');
+      setRawSource(raw,source);
+      raw.initSvg(); raw.render(); raw.moveBy(45,45);
+      return 'raw';
+    }
+    let previous=null;
+    for (let i=0;i<specs.length;i++) {
+      const spec=specs[i];
+      const b=visualWorkspace.newBlock(spec.type);
+      Object.entries(spec.fields||{}).forEach(([field,v])=>b.setFieldValue(String(v),field));
+      b.initSvg();b.render();b.moveBy(45,45+i*90);
+      if (spec.note && b.setCommentText) b.setCommentText(spec.note);
+      for (const [input,child] of Object.entries(spec.inputs||{})) {
+        const c=visualWorkspace.newBlock(child.type);
+        Object.entries(child.fields||{}).forEach(([field,v])=>c.setFieldValue(String(v),field));
+        c.initSvg();c.render();c.moveBy(260,45+i*90);
+        b.getInput(input).connection.connect(c.outputConnection);
+      }
+      if (previous) previous.nextConnection.connect(b.previousConnection);
+      previous=b;
+    }
+    return 'visual';
+  } finally { B.Events.enable(); }
+}
+
+async function openBlockEditor() {
+  const doc=activeDoc();
+  if (!doc) return;
+  if (isBlockMode() && visualWorkspace && visualDocId===doc.id) return;
+  const source=cm.getValue();
+  $('#codeView').classList.add('hidden');
+  $('#blocksView').classList.remove('hidden');
+  $('#btnCode').classList.remove('active');
+  $('#btnBlocks').classList.add('active');
+  $('#btnCode').setAttribute('aria-selected','false');
+  $('#btnBlocks').setAttribute('aria-selected','true');
+  $('#editorMode').textContent=settings.language==='en'?'Blocks':'Bloques';
+  const term=$('#termPanel');
+  if (!term.dataset.preBlocksHeight) term.dataset.preBlocksHeight=term.style.height||'280px';
+  if (term.dataset.collapsed!=='1') term.style.height='160px';
+  setTimeout(()=>fitAddon.fit(),40);
+  if (!visualWorkspace) $('#blocklyCode').textContent='Cargando Blockly…';
+  try {
+    await loadBlockEditor();
+    if (doc!==activeDoc() || !isBlockMode()) return;
+    let conversion='saved';
+    if (doc.blockState && doc.blockSource===source) {
+      try {loadVisualProject(doc.blockState);}
+      catch {doc.blockState=null;conversion=pythonToVisual(source);}
+    } else {
+      const reconciled=reconcileCodeExampleEdit(doc,source) || reconcileGeneratedEdit(doc,source);
+      if (reconciled) {loadVisualProject(reconciled);conversion='visual';}
+      else conversion=pythonToVisual(source);
+      const saved=window.Blockly.serialization.workspaces.save(visualWorkspace);
+      doc.blockState=saved;
+      doc.blockSource=source;
+      doc.blockStateHash=blockStateSignature(saved);
+    }
+    updateBlockTheme(settings.theme);
+    updateBlockPreview();
+    updateBlockGuidance();
+    visualDocId=doc.id;
+    window.Blockly.svgResize(visualWorkspace);
+    if (conversion==='raw') toast(settings.language==='en'?
+      'Complex Python was preserved in an editable multiline block.':'Python complejo conservado en un bloque multilínea editable.','info',4500);
+  } catch (err) {
+    $('#blocklyCode').textContent='No se pudo abrir el editor visual.';
+    $('#blocklyMessage').dataset.level='error';
+    $('#blocklyMessage').textContent=err.message;
+    toast(err.message,'error',5500);
+  }
+}
+function getBlockPython() {
+  try {
+    const validation=validateBlockProject();
+    if (validation.errors.length) throw new Error(validation.errors.join(' · '));
+    return blockPython();
+  } catch (err) {
+    toast(err.message,'warn',5500);
+    return null;
+  }
+}
+async function runBlocks() {
+  if (!getBlockPython()) return;
+  const code=syncBlocksToDoc();
+  if (code===null) return;
+  if (serial.connected) await runInRam(code,'Programa por bloques');
+  else runLocalPython(code,'Programa por bloques');
+}
+function isBlockMode() { return !$('#blocksView').classList.contains('hidden'); }
+function syncBlocksToDoc() {
+  const doc=activeDoc();
+  if (!doc || !visualWorkspace || visualDocId!==doc.id) return null;
+  clearTimeout(blocksTimer);
+  const data=window.Blockly.serialization.workspaces.save(visualWorkspace);
+  const hasBlocks=visualWorkspace.getAllBlocks(false).length>0;
+  const unchanged=doc.blockSource!==null && doc.blockStateHash===blockStateSignature(data) &&
+    (doc.blockSource.trim() || !hasBlocks);
+  let code;
+  try { code=unchanged ? doc.blockSource :
+    (hasBlocks ? blockPython() : ''); }
+  catch (err) {toast(err.message,'error');return null;}
+  if (!unchanged && doc.exampleGuide) code=commentedExample(doc.exampleGuide,code);
+  doc.blockState=data;
+  doc.blockStateHash=blockStateSignature(data);
+  doc.blockSource=code;
+  doc.content=code;
+  if (cm.getValue()!==code) {
+    doc.dirty=true;
+    cm.setValue(code);
+    renderTabs();
+  }
+  return code;
+}
+function showCodeView() {
+  $('#blocksView').classList.add('hidden');
+  $('#codeView').classList.remove('hidden');
+  $('#btnBlocks').classList.remove('active');
+  $('#btnCode').classList.add('active');
+  $('#btnBlocks').setAttribute('aria-selected','false');
+  $('#btnCode').setAttribute('aria-selected','true');
+  const term=$('#termPanel');
+  if (term.dataset.preBlocksHeight) {
+    if (term.dataset.collapsed!=='1') term.style.height=term.dataset.preBlocksHeight;
+    delete term.dataset.preBlocksHeight;
+  }
+  updateEditorMode();
+  cm.refresh();
+  setTimeout(()=>fitAddon.fit(),40);
+}
+function blocksToEditor() {
+  if (isBlockMode() && visualWorkspace && syncBlocksToDoc()===null) return false;
+  showCodeView();
+  cm.focus();
+  return true;
+}
+async function saveBlocksToDevice() {
+  if (!serial.connected) { toast('Conecta la placa primero','warn'); return; }
+  if (!getBlockPython()) return;
+  if (syncBlocksToDoc()!==null) await saveActiveToDevice();
+}
+function exportBlockProject() {
+  if (!visualWorkspace) return;
+  const data=window.Blockly.serialization.workspaces.save(visualWorkspace);
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+  const url=URL.createObjectURL(blob);
+  const link=Object.assign(document.createElement('a'),
+    {href:url,download:'espwebstudio-bloques.json'});
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url),1000);
+  toast('Proyecto visual exportado','success');
+}
+
+async function probeBlockBoard() {
+  if (!serial.connected) { toast('Conecta la placa para verificar el firmware','warn'); return; }
+  if (state.running) { toast('Espera a que termine la ejecución actual','warn'); return; }
+  const result=$('#blockProbeResult');
+  result.classList.remove('hidden');
+  result.textContent='Verificando módulos en la placa…';
+  setBusy(true,'Verificando MicroPython…');
+  const code=[
+    'import os, gc, machine',
+    'print("Placa:", os.uname().machine)',
+    'print("Firmware:", os.uname().version)',
+    'print("Memoria libre:", gc.mem_free())',
+    'for name in ("network", "bluetooth", "espnow", "neopixel", "esp32"):',
+    '    try:',
+    '        __import__(name)',
+    '        print(name + ": disponible")',
+    '    except ImportError:',
+    '        print(name + ": no incluido en este firmware")'
+  ].join('\n')+'\n';
+  try {
+    const output=await serial.rawExec(code,8000);
+    result.textContent=(output.stdout||'Sin respuesta') +
+      (output.stderr ? '\n'+output.stderr : '');
+  } catch (err) {
+    result.textContent='No se pudo verificar: '+err.message;
+  } finally {
+    setBusy(false);
+    if (visualWorkspace) window.Blockly.svgResize(visualWorkspace);
+  }
+}
+
+$('#btnBlocks').addEventListener('click',openBlockEditor);
+$('#btnCode').addEventListener('click',()=>{
+  if (isBlockMode()) blocksToEditor();
+  else cm.focus();
+});
+$$('.mode-tab').forEach(tab=>tab.addEventListener('keydown',event=>{
+  if (!['ArrowLeft','ArrowRight','Home','End'].includes(event.key)) return;
+  event.preventDefault();
+  const target=event.key==='Home'?'#btnCode':event.key==='End'?'#btnBlocks':
+    (tab.id==='btnCode'?'#btnBlocks':'#btnCode');
+  $(target).click();
+  $(target).focus();
+}));
+$('#btnBlockRun').addEventListener('click',runBlocks);
+$('#btnBlockSave').addEventListener('click',saveBlocksToDevice);
+$('#btnBlockToEditor').addEventListener('click',blocksToEditor);
+$('#btnBlockProbe').addEventListener('click',probeBlockBoard);
+$('#btnBlockExport').addEventListener('click',exportBlockProject);
+$('#btnBlockImport').addEventListener('click',() => $('#blockProjectFile').click());
+$('#blockProjectFile').addEventListener('change',async event => {
+  const file=event.target.files[0];
+  event.target.value='';
+  if (!file || !visualWorkspace) return;
+  if (file.size>1024*1024) {toast('El proyecto JSON supera 1 MB','error');return;}
+  const backup=window.Blockly.serialization.workspaces.save(visualWorkspace);
+  try {
+    loadVisualProject(JSON.parse(await file.text()));
+    toast('Proyecto de bloques cargado','success');
+  } catch (err) {
+    try {loadVisualProject(backup);} catch {}
+    toast('JSON de bloques inválido: '+err.message,'error',5500);
+  }
+});
+$('#btnBlockClear').addEventListener('click',() => {
+  if (!visualWorkspace || !visualWorkspace.getAllBlocks(false).length) return;
+  if (confirm('¿Borrar todos los bloques del proyecto actual?')) {
+    visualWorkspace.clear();
+    updateBlockPreview();
+  }
+});
+$('#blockBoard').value=localStorage.getItem(BLOCKS_BOARD_KEY)==='generic'?'generic':'c3';
+$('#blockBoard').addEventListener('change',() => {
+  localStorage.setItem(BLOCKS_BOARD_KEY,$('#blockBoard').value);
+  updateBlockPreview();
+});
+const SIDEBAR_KEY='espwebstudio.sidebar.collapsed';
+const GUIDE_KEY='espwebstudio.blocks.guide.hidden';
+function resizeEditorLayout() {
+  requestAnimationFrame(()=>{
+    cm.refresh();
+    if (visualWorkspace && isBlockMode()) window.Blockly.svgResize(visualWorkspace);
+    fitAddon.fit();
+  });
+}
+function showSidebar(show) {
+  $('#workspace').classList.toggle('sidebar-collapsed',!show);
+  const toggle=$('#btnSidebarToggle');
+  toggle.setAttribute('aria-expanded',String(show));
+  const label=show?
+    (settings.language==='en'?'Hide explorer':'Ocultar explorador'):
+    (settings.language==='en'?'Show explorer':'Mostrar explorador');
+  toggle.title=label;
+  toggle.setAttribute('aria-label',label);
+  toggle.innerHTML='<i data-lucide="panel-left-'+(show?'close':'open')+'"></i>';
+  localStorage.setItem(SIDEBAR_KEY,show?'0':'1');
+  refreshIcons();
+  resizeEditorLayout();
+}
+showSidebar(localStorage.getItem(SIDEBAR_KEY)!=='1');
+$('#btnSidebarToggle').addEventListener('click',()=>
+  showSidebar($('#workspace').classList.contains('sidebar-collapsed')));
+function showBlockGuide(show) {
+  $('#blockConnectionGuide').classList.toggle('hidden',!show);
+  $('#btnGuideToggle').setAttribute('aria-expanded',String(show));
+  localStorage.setItem(GUIDE_KEY,show?'0':'1');
+  resizeEditorLayout();
+}
+showBlockGuide(localStorage.getItem(GUIDE_KEY)!=='1');
+$('#btnCloseBlockGuide').addEventListener('click',()=>showBlockGuide(false));
+$('#btnGuideToggle').addEventListener('click',()=>
+  showBlockGuide($('#blockConnectionGuide').classList.contains('hidden')));
+$('#blockPinHelp').addEventListener('toggle',() => {
+  if (visualWorkspace) setTimeout(() => window.Blockly.svgResize(visualWorkspace),40);
+});
+window.addEventListener('resize',() => {
+  if (visualWorkspace && isBlockMode())
+    window.Blockly.svgResize(visualWorkspace);
+});
 
 /* ============================================================================
    9. BINARY / BASE64 HELPERS
@@ -2223,19 +4288,22 @@ function updateStatusBar() {
     dot.classList.add('busy');
     $('#statusText').textContent = 'Instalando firmware…';
   } else {
-    dot.classList.remove('busy');
+    dot.classList.toggle('busy',state.running || localRunning);
   }
   if (serial.connected) {
     dot.classList.add('online');
     if (!firmwareBusy) $('#statusText').textContent = state.running ? 'Ejecutando…' : 'Conectado';
   } else {
     dot.classList.remove('online');
-    if (!firmwareBusy) $('#statusText').textContent = 'Desconectado';
+    if (!firmwareBusy) $('#statusText').textContent = localRunning ? 'Python local…' : 'Desconectado';
   }
   $('#baudText').textContent = `${settings.baud} baud`;
-  ['btnRun','btnSave','btnSaveAs','btnInterrupt','btnReset'].forEach(id => {
+  ['btnSave','btnSaveAs','btnReset'].forEach(id => {
     $('#'+id).disabled = !serial.connected || firmwareBusy;
   });
+  $('#btnRun').disabled=firmwareBusy || state.running || localRunning;
+  $('#btnRunLocal').disabled=firmwareBusy || state.running || localRunning;
+  $('#btnInterrupt').disabled=firmwareBusy || (!serial.connected && !localRunning);
   $('#btnConnect').disabled = firmwareBusy;
   $('#btnFirmware').disabled = firmwareBusy;
   const btnC = $('#btnConnect');
@@ -2256,7 +4324,7 @@ serial.on('state', ({ connected, unexpected }) => {
   if (!connected) {
     sidebarDisconnected();
     $('#chipText').textContent = 'ESP32';
-    $('#versionText').textContent = 'v2.0.0';
+    $('#versionText').textContent = 'v3.4.0';
     if (unexpected) toast('La placa se desconectó (¿USB desenchufado?)', 'error', 5000);
   }
 });
@@ -2442,43 +4510,123 @@ $('#btnFirmwareFlash').addEventListener('click', runFirmwareFlash);
    10c. BIBLIOTECA DE EJEMPLOS INTEGRADA
    ============================================================================ */
 const EXAMPLES = [
-  { id:'ap',   name:'wifi_ap.py',          title:'Modo AP',                  description:'Crea una red Wi-Fi propia con clave y muestra su dirección IP.', icon:'radio-tower' },
-  { id:'sta',  name:'wifi_sta.py',         title:'Modo STA',                 description:'Conecta el ESP32 a tu red y muestra IP y señal recibida.', icon:'wifi' },
-  { id:'scan', name:'wifi_scan_rssi.py',   title:'Escanear redes y RSSI',    description:'Lista redes visibles, canal y potencia de señal en dBm.', icon:'scan-search' },
-  { id:'rssi', name:'wifi_rssi.py',        title:'Monitor de RSSI',         description:'Mide diez veces la señal de la red a la que está conectada la placa.', icon:'activity' },
-  { id:'diag', name:'diagnostico.py',      title:'Diagnóstico de la placa', description:'Muestra firmware, memoria libre, frecuencia y estado Wi-Fi.', icon:'stethoscope' },
-  { id:'led',  name:'led_gpio8.py',        title:'LED de la C3 Super Mini', description:'Ejemplo de GPIO8 con LED activo en bajo; comprueba el pin de tu variante.', icon:'lightbulb' },
-  { id:'uart', name:'uart_gpio4_gpio5.py', title:'Comunicación UART',       description:'Envía PING por GPIO4 y recibe datos por GPIO5 a 115200 baudios.', icon:'cable' }
+  { id:'hello',name:'hola_mundo.py',title:'Hola mundo sin placa',en:'Hello world without a board',description:'Imprime Hola mundo con Python local; también funciona en una placa.',enDescription:'Print Hello world in local Python or on a connected board.',steps:['Pulsa Ejecutar local o F5 sin conectar un dispositivo.','Mira la pestaña Salida.'],enSteps:['Press Run locally or F5 without a board.','Read the Output tab.'],icon:'terminal' },
+  { id:'ap',name:'wifi_ap.py',title:'Modo AP',en:'AP mode',description:'Crea una red Wi-Fi propia con clave y muestra su dirección IP.',enDescription:'Create a Wi-Fi network and print its IP address.',steps:['Configura un SSID y una clave de al menos 8 caracteres.','Activa el AP y consulta su IP.'],enSteps:['Set an SSID and a password of at least 8 characters.','Enable the AP and print its IP.'],icon:'radio-tower' },
+  { id:'sta',name:'wifi_sta.py',title:'Modo STA',en:'STA mode',description:'Conecta el ESP32 a tu red y muestra IP y señal recibida.',enDescription:'Connect to your Wi-Fi network and print IP and signal strength.',steps:['Cambia SSID y CLAVE.','Espera hasta 15 segundos; consulta RSSI solo después de conectar.'],enSteps:['Change SSID and password.','Wait up to 15 seconds; read RSSI only while connected.'],icon:'wifi' },
+  { id:'scan',name:'wifi_scan_rssi.py',title:'Escanear redes y RSSI',en:'Scan networks and RSSI',description:'Lista redes visibles, canal y potencia de señal en dBm.',enDescription:'List nearby networks, channels and signal strength in dBm.',steps:['Activa el modo STA para usar la radio.','Escanea y muestra SSID, canal y RSSI.'],enSteps:['Enable STA to use the radio.','Scan and print SSID, channel and RSSI.'],icon:'scan-search' },
+  { id:'rssi',name:'wifi_rssi.py',title:'Monitor de RSSI',en:'RSSI monitor',description:'Conecta a la red y mide diez veces la señal en dBm.',enDescription:'Connect and sample Wi-Fi strength ten times in dBm.',steps:['Cambia SSID y CLAVE y espera la conexión con un límite de 15 segundos.','Si sigue conectado, llama a status("rssi") diez veces.','Maneja pérdidas de conexión y errores OSError sin bloquear.'],enSteps:['Change SSID and password and wait up to 15 seconds.','While connected, call status("rssi") ten times.','Handle disconnects and OSError.'],icon:'activity' },
+  { id:'diag',name:'diagnostico.py',title:'Diagnóstico de la placa',en:'Board diagnostics',description:'Muestra firmware, memoria libre, frecuencia y estado Wi-Fi.',enDescription:'Print firmware, free memory, clock speed and Wi-Fi state.',steps:['Consulta datos del sistema y libera memoria temporal.','Muestra IP y RSSI si STA ya está conectado.'],enSteps:['Read system data and collect temporary memory.','Print IP and RSSI if STA is already connected.'],icon:'stethoscope' },
+  { id:'led',name:'led_gpio8.py',title:'LED de la C3 Super Mini',en:'C3 Super Mini LED',description:'Parpadea GPIO8 con LED activo en bajo; verifica el pin de tu variante.',enDescription:'Blink active-low GPIO8; verify your board pin.',steps:['Inicializa el pin apagado, normalmente nivel 1.','Alterna 0 y 1 cinco veces con pausa de 400 ms.'],enSteps:['Initialize the pin off, usually level 1.','Alternate 0 and 1 five times with 400 ms pauses.'],icon:'lightbulb' },
+  { id:'uart',name:'uart_gpio4_gpio5.py',title:'Comunicación UART',en:'UART communication',description:'Envía PING por GPIO4 y recibe datos por GPIO5 a 115200 baudios.',enDescription:'Send PING on GPIO4 and receive on GPIO5 at 115200 baud.',steps:['Cruza TX con RX del otro dispositivo y comparte GND.','Espera respuestas y cierra UART1 al terminar.'],enSteps:['Cross TX and RX with the other device and share GND.','Wait for replies and close UART1 afterwards.'],icon:'cable' },
+  { id:'portal',name:'portal_educativo.py',title:'Portal cautivo educativo',en:'Educational captive portal',description:'AP propio con DNS y página informativa durante 45 segundos; sin formulario ni captura de datos.',enDescription:'Own AP with DNS and an information page for 45 seconds; no forms or data capture.',steps:['Cambia el SSID y la clave por una red de prueba propia.','Conecta un dispositivo autorizado y abre http://192.168.4.1; algunos sistemas muestran el portal automáticamente.','El AP y los servidores se cierran al final; se cuentan hasta 20 solicitudes HTTP.'],enSteps:['Set an SSID and password for your own test network.','Join with an authorized device and open http://192.168.4.1; automatic popup varies by OS.','AP and servers close after 45 seconds or 20 requests.'],warning:'Úsalo solo en una red propia y con consentimiento. La detección automática depende del sistema y HTTPS no se redirige. Inspirado en el recurso de Braian Mosqueira (CC BY 4.0); adaptación educativa sin suplantación ni credenciales.',enWarning:'Use only on your own network with consent. Automatic detection varies by OS; HTTPS is not redirected. Inspired by Braian Mosqueira’s CC BY 4.0 resource; educational adaptation without impersonation or credentials.',icon:'shield-check' }
 ];
+function commentedExample(guide,code) {
+  const en=settings.language==='en';
+  const title=en?(guide.en||guide.title):guide.title;
+  const steps=en?(guide.enSteps||guide.steps):guide.steps;
+  const header=['# '+title,'# '+(en?(guide.enDescription||guide.description):guide.description),
+    ...steps.map((step,i)=>'# '+(en?'Step ':'Paso ')+(i+1)+': '+step),
+    ...((en?guide.enWarning:guide.warning)?['# '+(en?'NOTICE: ':'AVISO: ')+(en?guide.enWarning:guide.warning)]:[])].join('\n');
+  return header+'\n\n'+code.trimEnd()+'\n';
+}
+async function openCatalogExample(item,visual) {
+  try {
+    await ensureBlocklyRuntime();
+    const workspace=new window.Blockly.Workspace();
+    let blockState,source;
+    try {
+      createBlockPreset(visual?item.id:'code-'+item.id,workspace);
+      blockState=window.Blockly.serialization.workspaces.save(workspace);
+      source=visual ? commentedExample(item,window.python.pythonGenerator.workspaceToCode(workspace)) :
+        $('#example-'+item.id).textContent.trim()+'\n';
+    } finally {workspace.dispose();}
+    const wasBlocks=isBlockMode();
+    if (wasBlocks && !blocksToEditor()) return;
+    const doc=newDoc(item.name || item.id.replace(/-/g,'_')+'.py',source,true);
+    doc.blockState=blockState;
+    doc.blockSource=source;
+    doc.blockStateHash=blockStateSignature(blockState);
+    doc.exampleGuide=item;
+    closeOverlay('examplesOverlay');
+    if (wasBlocks) await openBlockEditor();
+    else cm.focus();
+  } catch (err) {toast('Ejemplo: '+err.message,'error',6000);}
+}
 function openExamples() {
   const list = $('#examplesList');
   list.textContent = '';
-  EXAMPLES.forEach(item => {
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = 'example-item';
+  const addGroup=(name,items)=>{
+    const heading=document.createElement('h3');
+    heading.className='example-group';
+    heading.textContent=ui(name);
+    list.appendChild(heading);
+    items.forEach(item=>{
+    const card = document.createElement('article');
+    card.className = 'example-item';
+    card.dataset.search=[item.title,item.en,item.description,item.enDescription,...item.steps,...(item.enSteps||[]),item.warning||''].join(' ').toLowerCase();
+    const heading=document.createElement('div');
+    heading.className='example-heading';
     const icon = document.createElement('i');
     icon.setAttribute('data-lucide', item.icon);
     const body = document.createElement('span');
     const title = document.createElement('strong');
-    title.textContent = item.title;
+    title.textContent = settings.language==='en' ? (item.en||item.title) : item.title;
     const subtitle = document.createElement('small');
-    subtitle.textContent = item.description;
+    subtitle.textContent = settings.language==='en' ? (item.enDescription||item.description) : item.description;
     body.append(title, subtitle);
-    button.append(icon, body);
-    button.addEventListener('click', () => {
-      const source = $('#example-' + item.id).textContent.trim() + '\n';
-      newDoc(item.name, source, true);
-      closeOverlay('examplesOverlay');
-      toast('Ejemplo abierto: ' + item.name, 'success');
-      cm.focus();
+    heading.append(icon,body);
+    card.appendChild(heading);
+    const steps=document.createElement('ol');
+    steps.className='example-steps';
+    (settings.language==='en'?(item.enSteps||item.steps):item.steps).forEach(s=>{
+      const li=document.createElement('li');li.textContent=s;steps.appendChild(li);
     });
-    list.appendChild(button);
-  });
+    card.appendChild(steps);
+    if (item.warning) {
+      const warning=document.createElement('p');
+      warning.className='example-warning';
+      warning.setAttribute('role','note');
+      warning.textContent='⚠ '+(settings.language==='en'?(item.enWarning||item.warning):item.warning);
+      card.appendChild(warning);
+    }
+    const actions=document.createElement('div');actions.className='example-actions';
+    const button=document.createElement('button');button.type='button';
+    button.className='btn primary';
+    button.textContent=isBlockMode()?ui('openBlocks'):ui('openCode');
+    button.addEventListener('click',()=>openCatalogExample(item,item.visual));
+    actions.appendChild(button);
+    card.appendChild(actions);list.appendChild(card);
+    });
+  };
+  const catalog=[...EXAMPLES.map(item=>({...item,visual:false})),
+    ...Object.entries(EXAMPLE_GUIDES)
+      .filter(([id])=>!EXAMPLES.some(example=>example.id===id))
+      .map(([id,guide])=>({id,...guide,visual:true}))];
+  const groups=[
+    ['groupStart',['hello','local-math','usb-hello','led','blink','button','diag','system-check']],
+    ['groupHardware',['pwm','adc','adc-alarm','i2c','spi','uart','neopixel','rgb-sequence','light-sleep','deep-sleep']],
+    ['groupWifi',['ap','sta','scan','rssi','sta-rssi','http','ap-http','wifi-off','portal']],
+    ['groupRadio',['ble-beacon','ble-scan','ble-led','ble-stop','now-send','now-recv','now-monitor']],
+    ['groupData',['nvs','files','file-log']]
+  ];
+  const shown=new Set();
+  for (const [group,ids] of groups) {
+    const items=ids.map(id=>catalog.find(item=>item.id===id)).filter(Boolean);
+    items.forEach(item=>shown.add(item.id));
+    if (items.length) addGroup(group,items);
+  }
+  const rest=catalog.filter(item=>!shown.has(item.id));
+  if (rest.length) addGroup('groupMore',rest);
+  $('#exampleSearch').value='';
   refreshIcons();
   openOverlay('examplesOverlay');
 }
 $('#btnExamples').addEventListener('click', openExamples);
+$('#exampleSearch').addEventListener('input',e=>{
+  const query=e.target.value.trim().toLowerCase();
+  $$('#examplesList .example-item').forEach(card=>card.classList.toggle('hidden',
+    !!query && !card.dataset.search.includes(query)));
+});
 
 /* ============================================================================
    11. MENÚ CONTEXTUAL DEL EXPLORADOR
@@ -2557,10 +4705,23 @@ $('#btnConnect').addEventListener('click', async () => {
   }
 });
 
-$('#btnRun').addEventListener('click', () => runInRam());
-$('#btnSave').addEventListener('click', () => saveActiveToDevice());
-$('#btnSaveAs').addEventListener('click', () => saveActiveAs());
+$('#btnRun').addEventListener('click', () => isBlockMode()?runBlocks():runInRam());
+$('#btnRunLocal').addEventListener('click', () => {
+  if (isBlockMode()) {
+    if (!getBlockPython()) return;
+    const code=syncBlocksToDoc();
+    if (code!==null) runLocalPython(code,'Programa por bloques');
+  } else runLocalPython();
+});
+$('#btnSave').addEventListener('click', () => isBlockMode()?saveBlocksToDevice():saveActiveToDevice());
+$('#btnSaveAs').addEventListener('click', () => {
+  if (isBlockMode()) {
+    if (!getBlockPython() || syncBlocksToDoc()===null) return;
+  }
+  saveActiveAs();
+});
 $('#btnInterrupt').addEventListener('click', async () => {
+  if (stopLocalPython()) return;
   if (state.running) {
     await serial.abortRaw();
     toast('Ejecución interrumpida', 'info', 1600);
@@ -2606,6 +4767,7 @@ $('#btnTheme').addEventListener('click', () => {
 /* ---------- Settings modal ---------- */
 function openSettings() {
   $('#setTheme').value = settings.theme;
+  $('#setLanguage').value = settings.language;
   $('#setFontSize').value = settings.fontSize;
   $('#setTabSize').value = settings.tabSize;
   $('#setBaud').value = String(settings.baud);
@@ -2616,8 +4778,10 @@ function openSettings() {
   openOverlay('settingsOverlay');
 }
 $('#btnSettings').addEventListener('click', openSettings);
-$('#btnSaveSettings').addEventListener('click', () => {
+$('#btnSaveSettings').addEventListener('click', async () => {
+  const oldLanguage=settings.language;
   settings.theme = $('#setTheme').value;
+  settings.language = $('#setLanguage').value;
   settings.fontSize = Math.min(24, Math.max(10, +$('#setFontSize').value || 13.5));
   settings.tabSize = Math.min(8, Math.max(2, +$('#setTabSize').value || 4));
   settings.baud = +$('#setBaud').value;
@@ -2627,6 +4791,11 @@ $('#btnSaveSettings').addEventListener('click', () => {
   settings.autoReconnect = $('#setAutoReconnect').checked;
   saveSettings(settings);
   applyTheme(settings.theme);
+  applyLanguage(settings.language);
+  if (oldLanguage!==settings.language) {
+    try {await refreshBlocklyLanguage();}
+    catch (err) {toast('Blockly: '+err.message,'warn',5500);}
+  }
   applyEditorFont();
   cm.setOption('tabSize', settings.tabSize);
   cm.setOption('indentUnit', settings.tabSize);
@@ -2636,6 +4805,29 @@ $('#btnSaveSettings').addEventListener('click', () => {
   closeOverlay('settingsOverlay');
   toast('Ajustes guardados', 'success');
 });
+let clearingLocalData=false;
+$('#btnPrivacyInfo').addEventListener('click',()=>{
+  closeOverlay('settingsOverlay');
+  openDocs('privacy');
+});
+$('#btnClearLocalData').addEventListener('click',()=>{
+  if (firmwareBusy || state.running || localRunning) {
+    toast(settings.language==='en'?
+      'Stop the program or wait for firmware installation before clearing data.':
+      'Detén la ejecución o espera a que termine el firmware antes de borrar datos.','warn',5000);
+    return;
+  }
+  if (!confirm(settings.language==='en'?
+    'This clears app settings and the Blocks project in this browser. Code tabs you have not downloaded will be lost on reload. The board is not erased. Continue?':
+    'Se borrarán los ajustes y el proyecto de bloques de este navegador. Las pestañas de Código sin descargar se perderán al recargar. Esto no borra la placa. ¿Continuar?')) return;
+  clearTimeout(blocksTimer);
+  clearingLocalData=true;
+  for (let i=localStorage.length-1;i>=0;i--) {
+    const key=localStorage.key(i);
+    if (key?.startsWith('espwebstudio.')) localStorage.removeItem(key);
+  }
+  window.location.reload();
+});
 
 /* ============================================================================
    13. PALETA DE COMANDOS
@@ -2644,10 +4836,10 @@ const COMMANDS = [
   { id:'connect',   label:'Conectar / Desconectar placa',    icon:'plug',       key:'Ctrl+K',       run: () => $('#btnConnect').click() },
   { id:'firmware',  label:'Instalar MicroPython (firmware)', icon:'cpu',        key:'',             run: openFirmware },
   { id:'examples',  label:'Abrir ejemplos ESP32',           icon:'book-open',  key:'',             run: openExamples },
-  { id:'run',       label:'Ejecutar en RAM',                 icon:'play',       key:'F5',           run: runInRam },
-  { id:'save',      label:'Guardar en la placa',             icon:'save',       key:'Ctrl+S',       run: saveActiveToDevice },
-  { id:'saveAs',    label:'Guardar como… (en la placa)',     icon:'save-all',   key:'Ctrl+Shift+S', run: saveActiveAs },
-  { id:'export',    label:'Exportar pestaña activa al PC',   icon:'file-down',  key:'',             run: exportActiveDoc },
+  { id:'run',       label:'Ejecutar en placa o local',       icon:'play',       key:'F5',           run: () => $('#btnRun').click() },
+  { id:'save',      label:'Guardar en la placa',             icon:'save',       key:'Ctrl+S',       run: () => $('#btnSave').click() },
+  { id:'saveAs',    label:'Guardar como… (en la placa)',     icon:'save-all',   key:'Ctrl+Shift+S', run: () => $('#btnSaveAs').click() },
+  { id:'export',    label:'Descargar pestaña activa',        icon:'file-down',  key:'',             run: downloadCurrentProgram },
   { id:'newFile',   label:'Nuevo archivo',                   icon:'file-plus',  key:'Ctrl+N',       run: newFile },
   { id:'upload',    label:'Subir archivo del PC',            icon:'upload',     key:'',             run: triggerUpload },
   { id:'refresh',   label:'Actualizar explorador',           icon:'refresh-cw', key:'',             run: () => syncFilesystem() },
@@ -2660,6 +4852,8 @@ const COMMANDS = [
   { id:'about',     label:'Acerca de EspWebStudio',          icon:'info',       key:'',             run: openAbout },
   { id:'readme',    label:'Ver README (documentación)',      icon:'book-open',  key:'',             run: () => openDocs('readme') },
   { id:'license',   label:'Ver licencia MIT',                icon:'scale',      key:'',             run: () => openDocs('license') },
+  { id:'ai',        label:'Declaración de uso de IA',        icon:'sparkles',   key:'',             run: () => openDocs('ai') },
+  { id:'privacy',   label:'Privacidad y datos locales',      icon:'shield',     key:'',             run: () => openDocs('privacy') },
   { id:'closeTab',  label:'Cerrar pestaña activa',           icon:'x',          key:'Ctrl+W',       run: () => { if (state.activeId) closeDoc(state.activeId); } },
 ];
 
@@ -2731,7 +4925,7 @@ function openShortcuts() {
     ]},
     { title:'Placa', items: [
       ['Conectar / Desconectar', 'Ctrl+K'],
-      ['Ejecutar en RAM', 'F5'],
+      ['Ejecutar en placa o local', 'F5'],
       ['Guardar en la placa', 'Ctrl+S'],
       ['Guardar como', 'Ctrl+Shift+S'],
       ['Interrumpir ejecución', 'Ctrl+C / botón Detener'],
@@ -2766,9 +4960,9 @@ function openAbout() { openDocs('about'); }
 
 
 /* ============================================================================
-   15b. DOCUMENTACIÓN INTEGRADA (README + LICENCIA)
+   15b. DOCUMENTACIÓN INTEGRADA
    ============================================================================ */
-const README_TEXT = `EspWebStudio v2.0.0 — IDE MicroPython para ESP32
+const README_TEXT = `EspWebStudio v3.4.0 — IDE MicroPython para ESP32
 =========================================
 
 IDE web profesional para programar placas ESP32 (C3 Super Mini, S3,
@@ -2786,27 +4980,63 @@ CARACTERISTICAS
   eliminar, subir y descargar archivos, con espacio libre (os.statvfs).
 - Terminal REPL interactiva (xterm.js).
 - Panel de Salida: stdout/stderr capturados por separado, como Thonny.
-- Ejecutar en RAM (F5) con interrupcion real de la ejecucion.
+- Ejecutar en RAM de la placa o Python local sin placa (F5); Detener cancela ambos.
 - Guardado seguro en flash: transferencia binaria via Base64 en bloques.
 - Deteccion automatica del chip y la version de MicroPython.
 - Paleta de comandos (Ctrl+Shift+P), menu contextual, atajos de teclado.
 - Temas claro/oscuro y ajustes persistentes (localStorage).
-- Reconexion automatica con el ultimo puerto autorizado.
+- Reconexion opcional con el ultimo puerto autorizado (desactivada por defecto).
 - Instalacion del firmware MicroPython desde el navegador: Firmware.
-- Biblioteca de ejemplos: AP, STA, escaneo WiFi y RSSI, diagnostico,
-  LED GPIO8 y UART GPIO4/GPIO5.
+- Catalogo unificado: 37 ejemplos con pasos y comentarios. Cada ejemplo
+  abre en la vista actual: Codigo o Bloques, con representacion visual.
+- Estudio visual de 60 bloques propios: GPIO, ADC, PWM, LED RGB externo,
+  I2C, SPI, UART, WiFi, HTTP, BLE, ESP-NOW, archivos, NVS y watchdog.
+- 31 proyectos visuales editables y categorias Blockly de control,
+  funciones, variables, logica y matematicas.
+- Perfil C3 con comprobacion de GPIO reservados, diagnostico de modulos
+  del firmware y temas claro/oscuro tambien para Blockly.
+- Codigo y Bloques son pestanas dentro del editor, sin ventana superpuesta.
+  Ambos modos trabajan sobre el mismo documento y se convierten en ambas direcciones.
+  Python complejo se conserva en un bloque editable, sin perder contenido.
+- Accesibilidad arriba a la derecha, junto a la paleta de comandos:
+  tamano, contraste, movimiento y tipografia OpenDyslexic; idioma ES/EN
+  para la interfaz principal y el catalogo de ejemplos.
+- Explorador plegable, guia de bloques cerrable y barra comun con Perfil,
+  ejemplos y descarga del .py generado.
+- Proyectos de bloques en JSON importables y exportables; autoguardado local.
+- Ajustes: datos locales borrables con confirmacion; no borra la placa.
+- Documentacion integrada: Uso de IA y Privacidad (textos ampliados en el ZIP).
+- Pyodide en Web Worker: Python puro sin placa, como print("Hola mundo").
+  Los modulos de hardware de MicroPython requieren ESP32 conectada.
+- Portal cautivo educativo: AP/DNS/HTTP por 45 s, sin pedir credenciales.
+  Uso solo autorizado en red propia; recurso original CC BY 4.0:
+  https://github.com/BraianM-dev/portal-cautivo
 - Raw-paste con control de flujo para transferir codigo largo.
 
 
 INICIO RAPIDO
 -------------
-Requisito: navegador con Web Serial API -> Chrome o Edge de ESCRITORIO.
+Para conectar/flashear placa: Web Serial -> Chrome o Edge de escritorio.
+Para Python local sin placa: navegador con WebAssembly y Web Workers.
 
 1) GitHub Pages: sube este index.html a un repositorio y activa
    Settings -> Pages -> rama main (carpeta /root). Abre la URL.
-2) Local SIN servidor: descarga index.html y abrelo con doble clic
-   (Chrome/Edge lo tratan como contexto seguro).
-3) Conecta tu ESP32-C3 por USB y pulsa CONECTAR. Autoriza el puerto.
+2) Sin placa: pulsa Ver ejemplos, abre Hola mundo sin placa y ejecuta
+   con Ejecutar local o F5. Veras el texto en la pestana Salida.
+3) Con placa: conecta tu ESP32-C3 por USB y pulsa CONECTAR. Autoriza
+   el puerto, abre un ejemplo y pulsa F5 para ejecutarlo en la placa.
+4) Cambia entre Codigo y Bloques; el ejemplo se abre en la vista actual.
+   Oculta el explorador o la guia para ganar espacio y pulsa Descargar .py
+   para guardar el programa en tu PC sin placa.
+
+Los bloques generan MicroPython. El Python puro tambien se ejecuta localmente
+en Pyodide (CPython en navegador); machine/network/espnow/bluetooth necesitan
+una placa real. Blockly y Pyodide se cargan desde CDN cuando se usan.
+El autoguardado local de los bloques incluye campos con claves Wi-Fi.
+Las pestanas de Codigo estan en memoria: descarga el .py para conservarlo.
+La C3 admite BLE, no Bluetooth Classic. El USB de la C3 es Serial/JTAG;
+el bloque de salida USB usa print() y el terminal REPL del IDE.
+ESP-NOW y NeoPixel dependen de los modulos incluidos en el firmware.
 
 
 INSTALAR MICROPYTHON DESDE ESTA PAGINA
@@ -2829,7 +5059,7 @@ Necesitas Chrome/Edge de escritorio y HTTPS de GitHub Pages.
 ATAJOS DE TECLADO
 -----------------
   Ctrl+K           Conectar / Desconectar
-  F5               Ejecutar en RAM
+  F5               Ejecutar en placa o Python local
   Ctrl+S           Guardar en la placa
   Ctrl+Shift+S     Guardar como
   Ctrl+C           Interrumpir ejecucion (boton Detener)
@@ -2848,6 +5078,7 @@ COMO FUNCIONA
 - Flasheo: esptool-js 0.7.0 por CDN; firmware .bin elegido por el usuario.
 - Interrupcion: Ctrl-B (salir de Raw REPL) + Ctrl-C al interprete.
 - Sin backend, sin build, sin dependencias locales: solo CDNs.
+- Footer centrado: </> Disenado y Desarrollado por Braian M. | 2026.
 
 
 HOJA DE RUTA
@@ -2856,7 +5087,7 @@ HOJA DE RUTA
 [ ] Gestor de paquetes (mip / upip) desde la paleta
 [ ] Monitor de heap y WiFi en la barra de estado
 [ ] Tema automatico segun el sistema
-[ ] i18n (espanol / ingles)
+[ ] Traduccion integral de los mensajes de Blockly y avisos de placa
 
 
 CONTRIBUIR
@@ -2868,6 +5099,7 @@ archivo (sin build step) y valida el JS (node --check) antes de enviar.
 LICENCIA
 --------
 MIT. Ver la pestana «Licencia MIT» de esta ventana o el archivo LICENSE.
+La declaracion de IA y privacidad estan en las pestanas de esta ventana.
 `;
 const LICENSE_TEXT = `MIT License
 
@@ -2891,12 +5123,12 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 `;
-const ABOUT_TEXT = `EspWebStudio v2.0.0
+const ABOUT_TEXT = `EspWebStudio v3.4.0
 IDE MicroPython para placas ESP32 (C3 Super Mini, S3, clasico...)
 
 Un IDE web 100% cliente, sin backend, que se comunica con tu placa
-mediante la Web Serial API del navegador. Todo el codigo, la
-documentacion (README) y la licencia viven en UN UNICO archivo HTML.
+mediante la Web Serial API del navegador. La app y su documentacion
+integrada viven en UN UNICO archivo HTML.
 
 - Editor CodeMirror 5 con autocompletado MicroPython
 - Explorador de archivos en la placa (crear, borrar, renombrar,
@@ -2905,16 +5137,110 @@ documentacion (README) y la licencia viven en UN UNICO archivo HTML.
 - Ejecucion en RAM con interrupcion y guardado seguro (Base64)
 - Instalador web de MicroPython (C3, ESP32 y S3)
 - Ejemplos WiFi AP/STA/RSSI, LED, UART y diagnostico
+- Estudio visual: 60 bloques ESP32, 37 ejemplos en Codigo/Bloques,
+  ejecucion local con Pyodide, perfil C3 y proyectos JSON
 
-Dependencias (CDN): CodeMirror 5, xterm.js, Lucide Icons,
+Dependencias (CDN): CodeMirror 5, xterm.js, Blockly 13.3.0, Lucide Icons,
 esptool-js 0.7.0 (Apache-2.0).
 
-Licencia: MIT. Hecho con carino para la comunidad maker.`;
+Licencia: MIT. Consulta las pestañas Uso de IA y Privacidad.
+Hecho con cariño para la comunidad maker.`;
+
+const AI_TEXT_ES=`DECLARACIÓN DE USO DE IA — EspWebStudio v3.4.0
+Dirección y crédito del proyecto: Braian M.
+Asistencia empleada en esta etapa: OpenAI Codex.
+
+Braian M. indicó los objetivos, funciones y cambios de interfaz. OpenAI Codex
+asistió en implementación y revisión del IDE, editor por bloques, ejemplos,
+ayuda, README, avisos y comprobaciones automáticas. La decisión final sobre
+publicación y validación física corresponde a quien mantiene el proyecto.
+Las bibliotecas de terceros y el firmware conservan su autoría y licencias.
+
+Se comprobaron sintaxis, generación y serialización de bloques y se simularon
+algunos flujos. La radio, los pines, el flasheo, el portal automático y la
+carga real del intérprete local requieren pruebas en el entorno previsto.
+El responsable del proyecto decide su revisión final y publicación.
+
+Durante el uso normal, EspWebStudio no consulta un modelo de IA ni envía
+intencionalmente el código del editor a un servicio de IA. Pyodide ejecuta
+Python puro en el navegador y Web Serial comunica con la placa. Bibliotecas
+y fuentes se descargan de CDN; el código del usuario puede acceder a redes.
+
+Declaración completa: DECLARACION-IA.md en el paquete de descarga.
+Proyecto de referencia: https://github.com/BraianM-dev/portal-cautivo
+Su declaración corresponde a ese recurso, no a este IDE.`;
+
+const AI_TEXT_EN=`AI USE DISCLOSURE — EspWebStudio v3.4.0
+Project direction and credit: Braian M.
+Assistant used in this stage: OpenAI Codex.
+
+Braian M. specified goals, features and interface changes. OpenAI Codex
+assisted with implementation and review of the IDE, visual editor, examples,
+help, README, notices and automated checks. The maintainer decides on final
+publication and physical validation. Third-party libraries and firmware
+retain their own authorship and licenses.
+
+Syntax, code generation, block serialization and some simulated flows were
+checked. Radios, pins, flashing, automatic portal detection and actual local
+runtime loading still require testing in the intended environment. The project
+maintainer decides final review and publication.
+
+EspWebStudio does not call an AI model or intentionally upload editor code to
+an AI service during normal use. Pyodide runs pure Python in the browser and
+Web Serial talks to the board. Libraries and fonts load from CDNs; user code
+may make its own network requests.
+
+Full statement (Spanish): DECLARACION-IA.md in the download package.`;
+
+const PRIVACY_TEXT_ES=`PRIVACIDAD Y DATOS LOCALES — EspWebStudio v3.4.0
+
+- No hay backend propio para alojar tus proyectos ni telemetría integrada.
+- Ajustes y proyectos de Bloques se guardan en localStorage de este navegador.
+  Los bloques pueden incluir SSID y claves Wi-Fi: exporta JSON con cuidado.
+- Las pestañas de Código viven en memoria; descarga el .py para conservarlo.
+- Python local corre en un Web Worker. Web Serial requiere tu permiso para
+  conectar o flashear la placa. El permiso se revoca desde el navegador.
+- La aplicación descarga bibliotecas y la fuente opcional desde CDN. Tu propio
+  código puede conectarse a servicios externos.
+
+En Ajustes, Borrar datos guardados elimina preferencias y proyecto visual del
+origen actual y recarga la página. No borra archivos o firmware de la placa,
+ni descargas anteriores, ni revoca el permiso Web Serial del navegador.
+Descarga primero tu .py y exporta el JSON si deseas conservarlos.
+
+Detalle completo: PRIVACIDAD.md en el paquete de descarga.`;
+
+const PRIVACY_TEXT_EN=`PRIVACY AND LOCAL DATA — EspWebStudio v3.4.0
+
+- No project hosting backend or built-in telemetry.
+- Settings and Blocks projects live in this browser's localStorage. Blocks
+  may contain Wi-Fi SSIDs and passwords; handle JSON exports carefully.
+- Code tabs live in memory; download the .py to keep it.
+- Local Python runs in a Web Worker. Web Serial asks for permission to connect
+  or flash a board. Revoke that permission in your browser's site settings.
+- Libraries and the optional font load from CDNs. Your own code may contact
+  external services.
+
+Settings > Clear saved data removes app preferences and visual projects from
+this origin and reloads the page. It does not erase the board, past downloads
+or browser-granted Web Serial permission. Download the .py and export JSON
+first if you want to keep them.
+
+Full details (Spanish): PRIVACIDAD.md in the download package.`;
 
 function renderDoc(tab) {
-  $$('#docsOverlay [data-doc]').forEach(t => t.classList.toggle('active', t.dataset.doc === tab));
+  $$('#docsOverlay [data-doc]').forEach(t => {
+    const selected=t.dataset.doc===tab;
+    t.classList.toggle('active',selected);
+    t.setAttribute('aria-selected',String(selected));
+    t.tabIndex=selected?0:-1;
+  });
   const pane = $('#docPane');
-  const body = tab === 'readme' ? README_TEXT : tab === 'license' ? LICENSE_TEXT : ABOUT_TEXT;
+  pane.setAttribute('aria-labelledby',$('#docsOverlay [data-doc="'+tab+'"]').id);
+  const body=tab==='readme'?README_TEXT:tab==='license'?LICENSE_TEXT:
+    tab==='about'?ABOUT_TEXT:tab==='ai'?
+      (settings.language==='en'?AI_TEXT_EN:AI_TEXT_ES):
+      (settings.language==='en'?PRIVACY_TEXT_EN:PRIVACY_TEXT_ES);
   pane.innerHTML = '<pre style="white-space:pre-wrap; font-family:var(--font-mono); font-size:12.5px; line-height:1.65; color:var(--text-2); margin:0;">' +
                    escapeHtml(body) + '</pre>';
   pane.scrollTop = 0;
@@ -2922,8 +5248,21 @@ function renderDoc(tab) {
 function openDocs(tab='readme') {
   renderDoc(tab);
   openOverlay('docsOverlay');
+  $('#docsOverlay [data-doc="'+tab+'"]').focus();
 }
-$$('#docsOverlay [data-doc]').forEach(t => t.addEventListener('click', () => renderDoc(t.dataset.doc)));
+$$('#docsOverlay [data-doc]').forEach(t => {
+  t.addEventListener('click', () => renderDoc(t.dataset.doc));
+  t.addEventListener('keydown',e=>{
+    if (!['ArrowLeft','ArrowRight','Home','End'].includes(e.key)) return;
+    e.preventDefault();
+    const tabs=$$('#docsOverlay [data-doc]');
+    const index=tabs.indexOf(t);
+    const next=e.key==='Home'?0:e.key==='End'?tabs.length-1:
+      (index+(e.key==='ArrowRight'?1:-1)+tabs.length)%tabs.length;
+    tabs[next].click();
+    tabs[next].focus();
+  });
+});
 
 /* ============================================================================
    16. ATAJOS GLOBALES
@@ -2932,6 +5271,7 @@ document.addEventListener('keydown', e => {
   const inEditor = e.target.closest('.CodeMirror');
   const inInput = e.target.closest('input, textarea, select');
   const mod = e.ctrlKey || e.metaKey;
+  if ($$('.overlay:not(.hidden)').length) return;
 
   if (mod && e.shiftKey && (e.key === 'P' || e.key === 'p')) {
     e.preventDefault(); openCommandPalette(); return;
@@ -2942,6 +5282,17 @@ document.addEventListener('keydown', e => {
   if (mod && e.key === ',') { e.preventDefault(); openSettings(); return; }
   if (!inEditor && !inInput && e.key === '?' && !mod) { e.preventDefault(); openShortcuts(); return; }
   if (mod && e.key.toLowerCase() === 'k') { e.preventDefault(); $('#btnConnect').click(); return; }
+
+  if (isBlockMode()) {
+    if (e.key === 'F5') { e.preventDefault(); runBlocks(); }
+    if (mod && e.key.toLowerCase() === 's') {
+      e.preventDefault();
+      if (e.shiftKey) exportBlockProject();
+      else saveBlocksToDevice();
+    }
+    return;
+  }
+
   if (e.key === 'F5') { e.preventDefault(); runInRam(); return; }
   if (mod && !e.shiftKey && e.key.toLowerCase() === 's') {
     e.preventDefault(); saveActiveToDevice(); return;
@@ -2992,6 +5343,7 @@ document.addEventListener('keydown', e => {
    18. ANTES DE CERRAR LA PÁGINA
    ============================================================================ */
 window.addEventListener('beforeunload', e => {
+  if (clearingLocalData) return;
   if (firmwareBusy || state.docs.some(d => d.dirty)) {
     e.preventDefault();
     e.returnValue = '';
@@ -3004,7 +5356,7 @@ window.addEventListener('beforeunload', e => {
 (async function tryAutoReconnect() {
   if (!('serial' in navigator)) {
     if (!window.location.protocol.startsWith('http')) return;
-    toast('Tu navegador no soporta Web Serial API. Usa Chrome o Edge en escritorio.', 'warn', 6000);
+    toast('Python local funciona sin placa. Para conectar una ESP32 usa Chrome o Edge de escritorio.', 'info', 6000);
     return;
   }
   if (!settings.autoReconnect) return;
@@ -3027,8 +5379,18 @@ window.addEventListener('beforeunload', e => {
    20. ARRANQUE + PWA
    ============================================================================ */
 function boot() {
+  applyLanguage(settings.language);
+  applyAccessibility();
   sidebarDisconnected();
-  newDoc('main.py', '', true);
+  const first=newDoc('main.py', '', true);
+  try {
+    const saved=JSON.parse(localStorage.getItem(BLOCKS_STORAGE_KEY)||'null');
+    if (saved?.blocks?.blocks?.length) {
+      first.blockState=saved;
+      first.blockSource='';
+      first.blockStateHash=blockStateSignature(saved);
+    }
+  } catch { /* proyecto anterior corrupto: empezar con Python vacío */ }
   updateStatusBar();
   refreshIcons();
 
