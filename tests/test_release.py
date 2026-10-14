@@ -30,7 +30,7 @@ class ReleaseTests(unittest.TestCase):
             file.write(js[0])
             file.flush()
             subprocess.run(["node", "--check", file.name], check=True)
-        self.assertEqual(len(EXAMPLES), 18)
+        self.assertEqual(len(EXAMPLES), 19)
         for name, code in EXAMPLES.items():
             with self.subTest(example=name):
                 ast.parse(code, filename=name + ".py")
@@ -38,15 +38,15 @@ class ReleaseTests(unittest.TestCase):
     def test_catalogue_and_exported_examples(self):
         catalogue = HTML.split("const EXAMPLES =", 1)[1].split("const ", 1)[0]
         ids = set(re.findall(r"\{ id:'([^']+)'", catalogue))
-        self.assertEqual(len(ids), 18)
+        self.assertEqual(len(ids), 19)
         guides = HTML.split("const EXAMPLE_GUIDES = {", 1)[1].split("\n};", 1)[0]
         visual_ids = set(re.findall(r"^  (?:'([^']+)'|([\w-]+)):\{", guides, re.M))
-        self.assertEqual(len(ids) + len(visual_ids) - 3, 46)
+        self.assertEqual(len(ids) + len(visual_ids) - 3, 47)
         blocks = HTML.split("const definitions=[", 1)[1].split("definitions.forEach", 1)[0]
         self.assertEqual(len(re.findall(r"\b(?:statement|output|body)\('mp_", blocks)) +
                          int("B.Blocks.mp_python_raw" in HTML), 71)
         presets = HTML.split("const BLOCK_PRESETS = {", 1)[1].split("\n};", 1)[0]
-        self.assertEqual(len(re.findall(r"^  (?:'[^']+'|[\w-]+):\[", presets, re.M)), 49)
+        self.assertEqual(len(re.findall(r"^  (?:'[^']+'|[\w-]+):\[", presets, re.M)), 50)
         for path in (ROOT / "ejemplos").glob("*.py"):
             match = re.search(r"id:'([^']+)',name:'" + re.escape(path.name) + "'", HTML)
             self.assertIsNotNone(match, path.name)
@@ -304,7 +304,7 @@ process.stdout.write(vm.runInContext('localInteractiveCode('+JSON.stringify(fs.r
     def test_docs_and_static_publication(self):
         for name in ("README.md", "CHANGELOG.md", "GUIA-IOT.md", "PRIVACIDAD.md", "DECLARACION-IA.md"):
             contents = (ROOT / name).read_text(encoding="utf-8")
-            self.assertIn("v3.6.1", contents, name)
+            self.assertIn("v3.7.0", contents, name)
         self.assertIn('lucide@1.18.0', HTML)
         self.assertNotIn('lucide@latest', HTML)
         self.assertIn('Recuperar pestañas de Código', HTML)
@@ -312,3 +312,4 @@ process.stdout.write(vm.runInContext('localInteractiveCode('+JSON.stringify(fs.r
 
 if __name__ == "__main__":
     unittest.main()
+

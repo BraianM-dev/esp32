@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ESP32 · Chat con Ollama</title>
+<style>
+:root{color-scheme:dark;--bg:#101827;--panel:#192438;--text:#edf3ff;--muted:#b5c4db;--line:#3b4e68;--accent:#78d9ce}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:16px system-ui,sans-serif}main{max-width:1100px;margin:auto;padding:24px}h1{font-size:26px;margin:0 0 8px}p{line-height:1.5}.muted{color:var(--muted)}.grid{display:grid;grid-template-columns:340px 1fr;gap:20px}.panel{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:20px}label{display:block;margin:15px 0 6px}input,select,textarea,button{font:inherit;border-radius:8px}input,select,textarea{width:100%;padding:10px;border:1px solid var(--line);background:var(--bg);color:var(--text)}textarea{resize:vertical}button{padding:11px 15px;background:var(--accent);color:#092522;border:0;cursor:pointer;font-weight:650}button.secondary{background:#34465e;color:var(--text)}button:disabled{opacity:.5;cursor:wait}button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{outline:3px solid var(--accent);outline-offset:2px}.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.small{font-size:13px}#modelsStatus,#sendStatus{min-height:24px;overflow-wrap:anywhere}#messages{height:430px;overflow:auto;padding:8px 0}.bubble{padding:14px;border-radius:12px;margin:10px 0;background:#26364e;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.55}.bubble.user{border-left:4px solid var(--accent)}.bubble strong{display:block;font-size:13px;color:var(--accent);margin-bottom:6px}summary{cursor:pointer;margin-top:20px}.pair{display:grid;grid-template-columns:1fr 1fr;gap:12px}.error{color:#ffb8b8}header{margin-bottom:22px}#net{overflow-wrap:anywhere}@media(max-width:760px){main{padding:14px}.grid{grid-template-columns:1fr}#messages{height:350px}}@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
+</style></head>
+<body><main>
+<header><h1>Chat con Ollama</h1><div class="muted">ESP32-C3 Super Mini · El modelo se ejecuta en tu computadora.</div><p id="net" class="small" role="status">Consultando el ESP32…</p></header>
+<div class="grid">
+<section class="panel" aria-label="Configuración">
+<label for="url">Dirección de Ollama</label><input id="url" type="text" placeholder="http://192.168.1.50:11434" autocomplete="off" spellcheck="false">
+<p class="small muted">Usa la IP de la PC en la red local. Ollama debe aceptar conexiones desde la red y el firewall debe permitir el puerto 11434.</p>
+<button id="loadModels" type="button">Conectar y cargar modelos</button>
+<p id="modelsStatus" class="small" role="status" aria-live="polite"></p>
+<label for="model">Modelo instalado</label><select id="model" disabled><option value="">Conecta para cargar los modelos</option></select>
+<details><summary>Personalizar el asistente</summary>
+<label for="prompt">Instrucciones del asistente (system prompt)</label><textarea id="prompt" rows="6" maxlength="1600"></textarea>
+<div class="pair"><div><label for="temperature">Temperatura</label><input id="temperature" type="number" min="0" max="2" step="0.1" value="0.7"></div><div><label for="top_p">Top P</label><input id="top_p" type="number" min="0.1" max="1" step="0.05" value="0.9"></div></div>
+<div class="pair"><div><label for="num_ctx">Contexto</label><input id="num_ctx" type="number" min="512" max="8192" step="512" value="2048"></div><div><label for="max_tokens">Máximo de tokens</label><input id="max_tokens" type="number" min="32" max="1024" step="1" value="300"></div></div>
+<label for="history_messages">Mensajes previos enviados</label><input id="history_messages" type="number" min="0" max="12" value="8">
+<p class="small muted">Más contexto y tokens pueden aumentar el tiempo de respuesta. El historial se conserva durante esta sesión de la página.</p>
+</details>
+</section>
+<section class="panel" aria-label="Conversación">
+<div class="row"><strong>Conversación</strong><button class="secondary" id="clear" type="button">Nueva conversación</button></div>
+<div id="messages" role="log" aria-live="polite"></div>
+<form id="chatForm"><label for="message">Tu mensaje</label><textarea id="message" rows="3" maxlength="1000" placeholder="Escribe tu pregunta…" required></textarea>
+<p class="small muted">Enter para enviar · Mayús + Enter para un salto de línea.</p>
+<button id="send" disabled type="submit">Enviar</button><p id="sendStatus" class="small" role="status" aria-live="polite"></p></form>
+</section></div>
+<p class="small muted">Abre esta página desde la dirección del ESP32, con el puerto 8080. El AP de respaldo permite abrir la web, pero la PC con Ollama debe ser accesible desde esa red. Algunas redes escolares aíslan los dispositivos.</p>
+</main>
+<script>
+'use strict';
+// No se necesita Internet ni librerías externas. La web consulta al ESP32,
+// que reenvía /api/models a /api/tags de Ollama (sin CORS en el navegador).
+const $ = id => document.getElementById(id);
+let history = [], busy = false, loadedUrl = '', timeout = 180, monitoring = false;
+const settings = ['prompt','temperature','top_p','num_ctx','max_tokens','history_messages'];
+function localGet(key){try{return localStorage.getItem(key)}catch(e){return null}}
+function localSet(key,value){try{localStorage.setItem(key,value)}catch(e){}}
+function show(id,text,error=false){$(id).textContent=text;$(id).classList.toggle('error',error)}
+function setBusy(value){busy=value;$('loadModels').disabled=value;$('clear').disabled=value;$('model').disabled=value||!loadedUrl;$('url').disabled=value;settings.forEach(id=>$(id).disabled=value);$('send').disabled=value||!$('model').value||loadedUrl!==$('url').value.trim();}
+function addMessage(role,text){const box=document.createElement('div');box.className='bubble '+role;const title=document.createElement('strong');title.textContent=role==='user'?'Tú':'Asistente';const content=document.createElement('span');content.textContent=text;box.append(title,content);$('messages').appendChild(box);$('messages').scrollTop=$('messages').scrollHeight;}
+async function api(path,data,seconds){
+  const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),seconds*1000);
+  try{
+    const response=await fetch(path,{method:data===undefined?'GET':'POST',headers:data===undefined?{}:{'Content-Type':'application/json'},body:data===undefined?undefined:JSON.stringify(data),signal:controller.signal,cache:'no-store'});
+    let result;try{result=await response.json()}catch(e){throw new Error('Respuesta incompleta del ESP32. Revisa la conexión y la consola.')}
+    if(!response.ok)throw new Error(result.error||'Error HTTP '+response.status);return result;
+  }catch(error){if(error.name==='AbortError')throw new Error('Tiempo de espera agotado. El ESP32 o el modelo no respondieron dentro del límite.');if(error instanceof TypeError)throw new Error('No se pudo comunicar con el ESP32. Revisa la red y su dirección.');throw error;}finally{clearTimeout(timer)}
+}
+function persist(){localSet('esp32OllamaUrl',$('url').value.trim());localSet('esp32OllamaModel',$('model').value);const data={};settings.forEach(id=>data[id]=$(id).value);localSet('esp32OllamaSettings',JSON.stringify(data));}
+async function loadModels(){
+  const url=$('url').value.trim();if(!url){show('modelsStatus','Escribe la IP de la PC con Ollama.',true);return}
+  setBusy(true);show('modelsStatus','Consultando los modelos instalados…');loadedUrl='';
+  try{
+    const result=await api('/api/models',{ollama_url:url},30);$('model').replaceChildren();
+    for(const name of result.models){const option=document.createElement('option');option.value=name;option.textContent=name;$('model').appendChild(option)}
+    if(!result.models.length){const option=document.createElement('option');option.value='';option.textContent='No hay modelos instalados';$('model').appendChild(option);show('modelsStatus','Instala un modelo en la PC con Ollama y vuelve a cargar.',true);return}
+    const saved=localGet('esp32OllamaModel');if(result.models.includes(saved))$('model').value=saved;
+    loadedUrl=url;persist();show('modelsStatus',result.models.length+' modelo(s) disponible(s).');
+  }catch(error){$('model').replaceChildren();const option=document.createElement('option');option.value='';option.textContent='No se pudo cargar la lista';$('model').appendChild(option);show('modelsStatus',error.message,true)}finally{setBusy(false)}
+}
+$('loadModels').addEventListener('click',loadModels);
+$('url').addEventListener('input',()=>{loadedUrl='';$('model').disabled=true;$('send').disabled=true;show('modelsStatus','Carga los modelos de la nueva dirección.')});
+$('model').addEventListener('change',()=>{persist();setBusy(false)});settings.forEach(id=>$(id).addEventListener('change',persist));
+$('clear').addEventListener('click',()=>{history=[];$('messages').replaceChildren();show('sendStatus','Conversación reiniciada.')});
+$('chatForm').addEventListener('submit',async event=>{
+  event.preventDefault();if(busy)return;
+  const message=$('message').value.trim();if(!message||!$('model').value||loadedUrl!==$('url').value.trim())return;
+  if(!$('chatForm').reportValidity())return;
+  const count=Number($('history_messages').value);
+  const data={ollama_url:loadedUrl,model:$('model').value,message,system_prompt:$('prompt').value,history:count?history.slice(-count):[],history_messages:count,temperature:Number($('temperature').value),top_p:Number($('top_p').value),num_ctx:Number($('num_ctx').value),max_tokens:Number($('max_tokens').value)};
+  // Medir bytes UTF-8, no caracteres, antes de enviar a la placa.
+  if(new TextEncoder().encode(JSON.stringify(data)).length>16000){show('sendStatus','Reduce los mensajes previos o el tamaño del mensaje para no superar la memoria disponible.',true);return}
+  persist();setBusy(true);const start=Date.now();show('sendStatus','Ollama está generando una respuesta…');
+  const ticker=setInterval(()=>show('sendStatus','Ollama está trabajando… '+Math.floor((Date.now()-start)/1000)+' s. La primera respuesta puede tardar mientras carga el modelo.'),1000);
+  try{
+    const result=await api('/api/chat',data,timeout+15);
+    addMessage('user',message);addMessage('assistant',result.reply);
+    history.push({role:'user',content:message},{role:'assistant',content:result.reply});history=history.slice(-12);
+    $('message').value='';show('sendStatus','Respuesta recibida en '+Math.floor((Date.now()-start)/1000)+' s.');
+  }catch(error){show('sendStatus',error.message,true)}finally{clearInterval(ticker);setBusy(false);$('message').focus()}
+});
+$('message').addEventListener('keydown',event=>{if(event.key==='Enter'&&!event.shiftKey&&!event.isComposing){event.preventDefault();if(!busy)$('chatForm').requestSubmit()}});
+// Esta consulta puede responder aunque Ollama esté generando: prueba de actividad.
+async function checkStatus(){
+  if(monitoring)return;monitoring=true;
+  try{const state=await api('/api/status',undefined,6);show('net','ESP32 activo · '+state.mode+' · '+state.ip+':'+state.port+' · RAM libre: '+Math.round(state.free_memory/1024)+' KB'+(state.busy?' · Consultando Ollama':''));}
+  catch(error){show('net','No se recibió el estado del ESP32. Revisa la conexión.',true)}finally{monitoring=false}
+}
+async function init(){
+  try{
+    const state=await api('/api/status',undefined,10);timeout=state.timeout||180;
+    $('url').value=localGet('esp32OllamaUrl')||state.ollama_default_url;
+    let saved={};try{saved=JSON.parse(localGet('esp32OllamaSettings')||'{}')}catch(e){}
+    const defaults=state.defaults||{};for(const id of settings){const key=id==='prompt'?'system_prompt':id;if(saved[id]!==undefined)$(id).value=saved[id];else if(defaults[key]!==undefined)$(id).value=defaults[key]}
+    await checkStatus();await loadModels();
+  }catch(error){show('net',error.message+' Abre el HTML desde el ESP32, no como archivo local.',true)}
+  setInterval(checkStatus,15000);
+}
+init();
+</script></body></html>

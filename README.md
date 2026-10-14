@@ -1,4 +1,4 @@
-# EspWebStudio v3.6.1
+# EspWebStudio v3.7.0
 
 IDE web para programar ESP32 con MicroPython. Se publica como un único **index.html** en GitHub Pages: no requiere instalar un editor, Python ni un servidor en la PC.
 
@@ -8,11 +8,11 @@ IDE web para programar ESP32 con MicroPython. Se publica como un único **index.
 - Instalación de firmware MicroPython desde la web mediante Web Serial y **esptool-js 0.7.0**.
 - Perfiles de flasheo: **ESP32-C3 / C3 Super Mini**, **ESP32 clásico** y **ESP32-S3**. El instalador detecta el chip, comprueba el perfil y la capacidad de la flash antes de escribir.
 - Opción separada para borrar por completo la flash durante la instalación inicial. La opción comienza desmarcada.
-- Biblioteca integrada con 46 ejemplos editables en Código y Bloques: Python local, chatbot, Dungeon Master, GPIO, sensores, energía, I²C, SPI, UART/USB, Wi-Fi/HTTP, BLE, ESP-NOW, NeoPixel, NVS, archivos y portal cautivo educativo.
+- Biblioteca integrada con 47 ejemplos editables en Código y Bloques: Python local, chatbot, Dungeon Master, GPIO, sensores, energía, I²C, SPI, UART/USB, Wi-Fi/HTTP, BLE, ESP-NOW, NeoPixel, NVS, archivos y portal cautivo educativo.
 - Estudio visual Blockly con **71 bloques propios** y categorías estándar de control, funciones, variables, lógica, matemáticas y texto. Genera MicroPython editable para ejecutarlo en RAM o guardarlo en la placa.
 - **31 proyectos visuales editables**: LED, botón, PWM, ADC, I²C, SPI, UART, AP, STA/RSSI, escaneo Wi-Fi, HTTP, BLE, ESP-NOW, NeoPixel, NVS y archivos. Todos aparecen en el catálogo general con una guía de pasos; cada uno se abre en la vista actual y tiene una representación editable en Bloques.
 - Tema oscuro y claro integrado en Blockly, perfil ESP32-C3 Super Mini que comprueba pines reservados y botón **Verificar placa** para detectar módulos del firmware.
-- **Código ↔ Bloques como vistas del mismo editor:** el cambio se realiza mediante pestañas, sin ventana superpuesta. Los 46 ejemplos conservan una representación visual. Las ediciones sencillas de campos generados también se reconocen; Python arbitrario se conserva íntegro en un bloque personalizado editable.
+- **Código ↔ Bloques como vistas del mismo editor:** el cambio se realiza mediante pestañas, sin ventana superpuesta. Los 47 ejemplos conservan una representación visual. Las ediciones sencillas de campos generados también se reconocen; Python arbitrario se conserva íntegro en un bloque personalizado editable.
 - Menú de **Accesibilidad** en la esquina superior derecha, junto a la paleta de comandos, con tamaño de interfaz, contraste, reducción de movimiento y tipografía OpenDyslexic; acceso por Alt+A. Selector de idioma Español / English en Ajustes para la interfaz, el catálogo y los bloques propios.
 - **Explorador plegable y recuperable** en Código y Bloques: el editor ocupa todo el ancho cuando se cierra. En móvil se abre sobre el editor y se cierra con el botón, el fondo o Esc. La guía de conexiones y la vista previa del Python generado pueden ocultarse por separado para liberar espacio. Perfil de placa y Ver ejemplos permanecen en la barra compartida de ambas vistas.
 - **Un solo botón Ejecutar (F5)**: si hay ESP32 conectada, ejecuta allí; si no hay placa, el Python puro se ejecuta con Pyodide en un Web Worker. Los imports de hardware se detectan antes de enviar el programa al intérprete local y muestran un aviso para conectar la placa.
@@ -22,7 +22,7 @@ IDE web para programar ESP32 con MicroPython. Se publica como un único **index.
 
 ## Declaración de IA y privacidad
 
-La [declaración de uso de IA](DECLARACION-IA.md) identifica el papel de Braian M. y la asistencia de OpenAI Codex por componente, las pruebas automatizadas realizadas y las validaciones físicas pendientes. También está disponible desde **Documentación → Uso de IA** dentro del HTML. La aplicación no integra un modelo de IA durante la programación o ejecución.
+La [declaración de uso de IA](DECLARACION-IA.md) identifica el papel de Braian M. y la asistencia de OpenAI Codex por componente, las pruebas automatizadas realizadas y las validaciones físicas pendientes. También está disponible desde **Documentación → Uso de IA** dentro del HTML. El IDE no envía el código del editor a un modelo de IA; el chat opcional consulta el servidor Ollama elegido por el usuario.
 
 La [guía de privacidad](PRIVACIDAD.md) explica qué se guarda en `localStorage`, el permiso Web Serial y las dependencias de CDN. **Los bloques y los borradores de Código pueden guardar claves Wi-Fi en este navegador**. Descarga el `.py` o exporta `.json` antes de usar **Ajustes → Borrar datos guardados**. El borrado recarga la página y no modifica la placa ni revoca el permiso serial del navegador. La reconexión automática está desactivada por defecto; la recuperación de borradores está activada y puede desactivarse en Ajustes. Al restaurar una pestaña se trata como borrador local: verifica la placa antes de guardarla.
 
@@ -31,6 +31,15 @@ La interfaz se sirve como archivo estático. Las bibliotecas del editor y del fl
 El botón **Bloques** carga Blockly 13.3.0 desde CDN cuando se abre la vista visual. Ejecutar un programa de Python puro sin placa carga Pyodide v314.0.7 bajo demanda desde CDN; la fuente OpenDyslexic también se descarga bajo demanda. Todo el código de la aplicación y los ejemplos siguen dentro de **index.html**; no hace falta instalar programas en la PC. El MicroPython generado se ejecuta en el ESP32 conectado mediante el mismo botón **Conectar** del IDE. Para ejemplos con `input()` en el navegador se abre un cuadro de respuesta dentro de la página, conectado al Web Worker.
 
 Los archivos `ejemplos/*.py` son copias opcionales de programas integrados en el HTML. `.github/workflows/ci.yml` y `tests/` sirven para desarrollo y revisión: la página publicada solo necesita `index.html`. Para comprobar una modificación antes de subirla, ejecuta `python -m unittest discover -s tests -v` y `node tests/test_runtime.js` desde la raíz del paquete. Las pruebas no sustituyen una comprobación en una placa real.
+
+
+## Web por USB y chat con Ollama
+
+El botón **Web por USB** reutiliza la conexión del IDE para abrir la página del ESP32 dentro de un panel, sin que PC y placa compartan Wi-Fi. **Crear archivos del chat** abre `main.py` e `index.html` como borradores: guarda ambos en la raíz de la placa, ejecuta `main.py` y carga la web. En usos posteriores, **Iniciar main.py guardado** arranca el servicio sin volver a subirlo.
+
+El selector superior permite consultar Ollama desde **esta PC**, usando `http://localhost:11434`, o desde **el Wi-Fi del ESP32**, usando la IP LAN de Ollama. Se conservan selector de modelos, historial, system prompt, temperatura, top-p, contexto, tokens y acceso HTTP por Wi-Fi. Para modo PC configura `OLLAMA_ORIGINS=https://braianm-dev.github.io`, reinicia Ollama y permite acceso local si el navegador lo solicita.
+
+Consulta la [guía completa del chat USB](ejemplos/chat_ollama/README.md). Requiere el protocolo cooperativo del ejemplo; no transporta automáticamente cualquier servidor HTTP. No necesita un segundo puerto USB ni un programa puente instalado en la PC. La validación física en ESP32-C3 queda pendiente.
 
 ## Usar todo el ancho del editor
 
@@ -146,3 +155,4 @@ Configura SSID y clave de una red de prueba propia y conecta únicamente disposi
 EspWebStudio se distribuye bajo licencia **MIT** (archivo LICENSE). La transparencia sobre asistencia de IA consta en [DECLARACION-IA.md](DECLARACION-IA.md). Usa bibliotecas de terceros con sus propias licencias: esptool-js de Espressif (**Apache-2.0**), Blockly (**Apache-2.0**), CodeMirror, xterm.js y Lucide. La ejecución local utiliza Pyodide y la fuente opcional OpenDyslexic se distribuye bajo SIL OFL 1.1. Blockly, Lucide 1.18.0 y el flasheador se cargan bajo versiones fijas; el resto de dependencias del editor también se sirven por CDN.
 
 Documentación técnica: [Blockly](https://developers.google.com/blockly/guides/create-custom-blocks/code-generation/overview), [ESP32-C3 GPIO](https://docs.espressif.com/projects/esp-idf/en/stable/esp32c3/api-reference/peripherals/gpio.html), [MicroPython ESP-NOW](https://docs.micropython.org/en/latest/library/espnow.html), [MicroPython BLE](https://docs.micropython.org/en/latest/library/bluetooth.html), [esptool-js](https://github.com/espressif/esptool-js), [Web Serial](https://developer.chrome.com/docs/capabilities/serial), [Raw REPL](https://docs.micropython.org/en/latest/reference/repl.html), [Pyodide en Web Worker](https://pyodide.org/en/stable/usage/webworker.html) y [OpenDyslexic](https://github.com/antijingoist/opendyslexic).
+
