@@ -1000,6 +1000,7 @@ html[data-theme="dark"] .blocklyWidgetDiv input { background: #111c2e; color: #f
             <option value="generic">ESP32 / otro modelo</option>
           </select>
           <button class="btn" type="button" id="btnExamples" title="Ejemplos MicroPython para ESP32" aria-label="Abrir ejemplos MicroPython"><i data-lucide="book-open"></i><span data-i18n="viewExamples">Ver ejemplos</span></button>
+          <button class="btn" type="button" id="btnUsbWeb" title="Abrir la web de la placa por el mismo cable USB"><i data-lucide="monitor"></i><span data-i18n="usbWeb">Web por USB</span></button>
           <button class="btn" type="button" id="btnDownloadCode" title="Descargar el programa actual como archivo .py" aria-label="Descargar programa Python"><i data-lucide="download"></i><span data-i18n="downloadPy">Descargar .py</span></button>
         </div>
       </div>
@@ -1090,7 +1091,7 @@ html[data-theme="dark"] .blocklyWidgetDiv input { background: #111c2e; color: #f
     </div>
     <div class="status-item version-item">
       <i data-lucide="info"></i>
-      <span id="versionText">v3.6.1</span>
+      <span id="versionText">v3.7.0</span>
     </div>
     <div class="status-item footer-credit" aria-label="Diseñado y Desarrollado por Braian M. | 2026"><span class="footer-code" aria-hidden="true">&lt;/&gt;</span><span>Diseñado y Desarrollado por Braian M. | 2026</span></div>
   </footer>
@@ -1108,6 +1109,24 @@ html[data-theme="dark"] .blocklyWidgetDiv input { background: #111c2e; color: #f
     </div>
     <div class="modal-footer"><button class="btn primary" data-close="accessibilityOverlay" data-i18n="done">Listo</button></div>
   </div>
+</div>
+
+
+<div class="overlay hidden" id="usbWebOverlay" role="dialog" aria-modal="true" aria-labelledby="usbWebTitle">
+ <div class="modal" style="width:min(1150px,96vw);max-height:95vh">
+  <div class="modal-header"><div class="title" id="usbWebTitle"><i data-lucide="monitor"></i> <span data-i18n="usbWeb">Web por USB</span></div><button class="icon-btn" id="usbWebClose" aria-label="Cerrar web USB"><i data-lucide="x"></i></button></div>
+  <div class="modal-body" style="padding:12px;overflow:auto">
+   <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+    <label for="usbOllamaRoute">Ollama desde:</label><select id="usbOllamaRoute"><option value="pc">Esta PC (sin compartir Wi-Fi)</option><option value="esp32">ESP32 (su conexión Wi-Fi)</option></select>
+    <button class="btn" id="usbWebLoad" type="button">Cargar web</button>
+    <button class="btn" id="usbCreateChat" type="button">Crear archivos del chat</button>
+    <button class="btn" id="usbStartMain" type="button">Iniciar main.py guardado</button>
+   </div>
+   <p id="usbWebStatus" role="status" aria-live="polite" style="margin:10px 0">Ejecuta el chat con soporte USB y pulsa Cargar web.</p>
+   <details style="margin-bottom:10px"><summary>Preparación de Ollama en esta PC</summary><p>Usa <code>http://localhost:11434</code>. Autoriza el origen de EspWebStudio en Ollama con <code>OLLAMA_ORIGINS=https://braianm-dev.github.io</code> y reinicia Ollama. Permite acceso a la red local si el navegador lo solicita. El origen permitido debe coincidir con la dirección donde abras el IDE.</p><p>Crear archivos abre main.py e index.html como borradores. Guarda ambos en la raíz de la placa, ejecuta main.py o usa Iniciar main.py guardado, y carga la web. El modo Wi-Fi continúa funcionando en http://IP:8080.</p></details>
+   <iframe id="usbWebFrame" title="Página del ESP32 transportada por USB" sandbox="allow-scripts" style="width:100%;height:65vh;min-height:350px;border:1px solid var(--border);border-radius:8px;background:white"></iframe>
+  </div>
+ </div>
 </div>
 
 <!-- ======================= TOASTS ======================= -->
@@ -2177,6 +2196,603 @@ finally:
     led.value(1 - ACTIVO)
 </script>
 
+<script type="text/x-micropython" id="example-ollama-usb">
+# ============================================================================
+# EspWebStudio: servicio
+# EspWebStudio: web-usb
+# Estos marcadores permiten ejecutar el servidor sin limite Raw REPL en el IDE.
+# CHAT OLLAMA - ESP32-C3 SUPER MINI - MicroPython
+# Copiar este archivo y index.html a la raiz de la placa con Thonny.
+# El modelo se ejecuta en la PC; el ESP32 sirve la web y comunica con Ollama.
+# ============================================================================
+
+# 1. CONFIGURACION: una cadena vacia significa red Wi-Fi abierta.
+WIFI_SSID = "Ceibal-2.4GHz"
+WIFI_PASSWORD = ""
+WIFI_TIMEOUT_SECONDS = 30
+AP_SSID = "ESP32-Ollama"
+AP_PASSWORD = "ESP32Chat1234"
+WEB_PORT = 8080
+OLLAMA_DEFAULT_URL = "http://192.168.1.50:11434"
+
+# 2. PERSONALIZACION DEL ASISTENTE: valores iniciales para la pagina.
+# Tambien se pueden cambiar desde el navegador, sin editar este archivo.
+SYSTEM_PROMPT = "Eres un asistente educativo. Responde en espanol con claridad, explica paso a paso y reconoce cuando no sabes algo."
+DEFAULT_TEMPERATURE = 0.7
+DEFAULT_TOP_P = 0.9
+DEFAULT_NUM_CTX = 2048
+DEFAULT_MAX_TOKENS = 300
+DEFAULT_HISTORY_MESSAGES = 8
+
+# 3. LIMITES: proteger la memoria y evitar conexiones esperando indefinidamente.
+MAX_REQUEST_BYTES = 16000
+MAX_RESPONSE_BYTES = 32000
+HTTP_TIMEOUT_SECONDS = 12
+OLLAMA_TIMEOUT_SECONDS = 180
+MODELS_TIMEOUT_SECONDS = 20
+MAX_CLIENTS = 4
+
+import network
+import time
+import gc
+import sys
+try:
+    import uselect as select
+except ImportError:
+    import select
+try:
+    import ubinascii as binascii
+except ImportError:
+    import binascii
+try:
+    import ujson as json
+except ImportError:
+    import json
+try:
+    import asyncio
+except ImportError:
+    import uasyncio as asyncio
+
+# Estado compartido: la web puede responder mientras Ollama esta trabajando.
+ESTACION = None
+MODO_RED = ""
+OLLAMA_OCUPADO = False
+CLIENTES = 0
+ULTIMO_ERROR = ""
+USB_ACTIVO = False
+USB_OCUPADO = False
+USB_PREFIX = "@EWSUSB:"
+
+
+def url_web(ip):
+    """Incluir el puerto real en todas las direcciones impresas."""
+    return "http://%s:%d/" % (ip, WEB_PORT)
+
+
+async def conectar_wifi_o_iniciar_ap():
+    """Intentar la red existente y crear un AP solo si no se obtiene IP."""
+    global ESTACION, MODO_RED
+    ap = network.WLAN(network.AP_IF)
+    ap.active(False)
+    ESTACION = network.WLAN(network.STA_IF)
+    ESTACION.active(False)
+    await asyncio.sleep_ms(300)
+    ESTACION.active(True)
+    await asyncio.sleep_ms(500)
+
+    # El escaneo permite comprobar nombre, cobertura y seguridad de la red.
+    # Seguridad 0 indica una red abierta. El escaneo es una llamada sincrona.
+    try:
+        print("Redes visibles:")
+        for red in ESTACION.scan():
+            print(red[0].decode("utf-8", "ignore"),
+                  "| senal:", red[3], "| seguridad:", red[4])
+    except Exception as error:
+        print("No se pudo escanear:", error)
+
+    if WIFI_SSID and WIFI_SSID != "NOMBRE_DE_TU_WIFI":
+        try:
+            print("Conectando a:", WIFI_SSID)
+            if WIFI_PASSWORD:
+                ESTACION.connect(WIFI_SSID, WIFI_PASSWORD)
+            else:
+                # Red abierta: no pasar una contrasena.
+                ESTACION.connect(WIFI_SSID)
+            comienzo = time.ticks_ms()
+            ultimo_estado = None
+            while not ESTACION.isconnected():
+                estado = ESTACION.status()
+                if estado != ultimo_estado:
+                    print("Estado Wi-Fi:", estado)
+                    ultimo_estado = estado
+                if time.ticks_diff(time.ticks_ms(), comienzo) >= WIFI_TIMEOUT_SECONDS * 1000:
+                    break
+                await asyncio.sleep_ms(300)
+        except Exception as error:
+            print("Error Wi-Fi:", error)
+
+    if ESTACION.isconnected():
+        MODO_RED = "Wi-Fi"
+        print("Conectado:", ESTACION.ifconfig())
+        print("Abre:", url_web(ESTACION.ifconfig()[0]))
+        return
+
+    print("Sin conexion. Estado final:", ESTACION.status())
+    ESTACION.active(False)
+    ap.active(True)
+    try:
+        ap.config(essid=AP_SSID, password=AP_PASSWORD, authmode=3)
+    except Exception:
+        ap.config(essid=AP_SSID, password=AP_PASSWORD)
+    MODO_RED = "AP de respaldo"
+    print("Red:", AP_SSID, "| Clave:", AP_PASSWORD)
+    print("Abre:", url_web(ap.ifconfig()[0]))
+    print("El AP no da acceso automatico a la LAN de Ollama.")
+
+
+def direccion_actual():
+    """Consultar la IP actual, incluso despues de una reconexion."""
+    interfaz = ESTACION if MODO_RED == "Wi-Fi" else network.WLAN(network.AP_IF)
+    return interfaz.ifconfig()[0]
+
+
+async def cerrar(writer):
+    """Cerrar sockets tambien en errores y cancelaciones por tiempo agotado."""
+    if writer is not None:
+        try:
+            writer.close()
+            await asyncio.wait_for(writer.wait_closed(), 2)
+        except Exception:
+            pass
+
+
+async def leer_linea(reader, limite=2048):
+    """Leer una linea HTTP con limite para no llenar la RAM."""
+    datos = bytearray()
+    while True:
+        parte = await reader.read(1)
+        if not parte:
+            if not datos:
+                raise ValueError("Conexion cerrada antes de completar HTTP")
+            raise ValueError("Linea HTTP incompleta")
+        datos.extend(parte)
+        if len(datos) > limite:
+            raise ValueError("Linea HTTP demasiado larga")
+        if parte == b"\n":
+            return bytes(datos)
+
+
+async def leer_exactos(reader, cantidad):
+    """No asumir que una lectura TCP devuelve todos los bytes solicitados."""
+    datos = bytearray()
+    while len(datos) < cantidad:
+        parte = await reader.read(min(1024, cantidad - len(datos)))
+        if not parte:
+            raise ValueError("Cuerpo HTTP incompleto")
+        datos.extend(parte)
+    return datos
+
+
+async def leer_cabeceras(reader):
+    primera = (await leer_linea(reader)).decode().strip()
+    cabeceras = {}
+    total = len(primera)
+    while True:
+        linea = await leer_linea(reader)
+        total += len(linea)
+        if total > 4096:
+            raise ValueError("Encabezados HTTP demasiado grandes")
+        if linea in (b"\r\n", b"\n"):
+            return primera, cabeceras
+        nombre, valor = linea.decode().split(":", 1)
+        cabeceras[nombre.lower().strip()] = valor.strip()
+
+
+async def leer_solicitud(reader):
+    primera, cabeceras = await leer_cabeceras(reader)
+    partes = primera.split()
+    if len(partes) != 3:
+        raise ValueError("Solicitud HTTP invalida")
+    largo = int(cabeceras.get("content-length", "0"))
+    if largo < 0 or largo > MAX_REQUEST_BYTES:
+        raise OverflowError("Mensaje demasiado grande: reduce el historial")
+    if "transfer-encoding" in cabeceras:
+        raise ValueError("La solicitud debe usar Content-Length")
+    cuerpo = await leer_exactos(reader, largo)
+    return partes[0], partes[1].split("?", 1)[0], cuerpo
+
+
+async def responder(writer, codigo, datos):
+    """Enviar un JSON al navegador, con estado HTTP y longitud correctos."""
+    cuerpo = json.dumps(datos).encode()
+    motivos = {200: "OK", 400: "Bad Request", 404: "Not Found",
+               413: "Payload Too Large", 502: "Bad Gateway",
+               503: "Service Unavailable", 504: "Gateway Timeout"}
+    writer.write(("HTTP/1.1 %d %s\r\nContent-Type: application/json; charset=utf-8\r\n"
+                  "Content-Length: %d\r\nConnection: close\r\nCache-Control: no-store\r\n\r\n"
+                  % (codigo, motivos.get(codigo, "Error"), len(cuerpo))).encode())
+    await writer.drain()
+    writer.write(cuerpo)
+    await writer.drain()
+
+
+async def servir_html(writer):
+    """Enviar la pagina por bloques; no cargar todo el HTML en RAM."""
+    import os
+    largo = os.stat("index.html")[6]
+    writer.write(("HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\n"
+                  "Content-Length: %d\r\nConnection: close\r\nCache-Control: no-store\r\n\r\n"
+                  % largo).encode())
+    await writer.drain()
+    with open("index.html", "rb") as archivo:
+        while True:
+            bloque = archivo.read(1024)
+            if not bloque:
+                break
+            writer.write(bloque)
+            await writer.drain()
+
+
+def separar_direccion(direccion):
+    """Aceptar IP o http://IP:11434. Usar la IP LAN de la PC, no localhost."""
+    direccion = str(direccion or OLLAMA_DEFAULT_URL).strip()
+    if "://" not in direccion:
+        direccion = "http://" + direccion
+    if not direccion.startswith("http://"):
+        raise ValueError("Usa http://IP_DE_LA_PC:11434")
+    servidor = direccion[7:].split("/", 1)[0]
+    if ":" in servidor:
+        host, puerto = servidor.rsplit(":", 1)
+        puerto = int(puerto)
+    else:
+        host, puerto = servidor, 11434
+    if not host or host in ("localhost", "127.0.0.1") or not 1 <= puerto <= 65535:
+        raise ValueError("Introduce la IP LAN de la computadora y un puerto valido")
+    return host, puerto
+
+
+async def peticion_ollama(direccion, ruta, solicitud=None):
+    """HTTP asincrono. Aceptar Content-Length, chunked y cierre de conexion."""
+    host, puerto = separar_direccion(direccion)
+    writer = None
+    try:
+        reader, writer = await asyncio.open_connection(host, puerto)
+        cuerpo = b"" if solicitud is None else json.dumps(solicitud).encode()
+        metodo = "GET" if solicitud is None else "POST"
+        writer.write(("%s %s HTTP/1.1\r\nHost: %s:%d\r\n"
+                      "Content-Type: application/json\r\nContent-Length: %d\r\n"
+                      "Connection: close\r\n\r\n"
+                      % (metodo, ruta, host, puerto, len(cuerpo))).encode())
+        writer.write(cuerpo)
+        await writer.drain()
+        primera, cabeceras = await leer_cabeceras(reader)
+        codigo = int(primera.split()[1])
+        respuesta = bytearray()
+
+        # Algunos servidores HTTP envian el JSON en bloques (chunked).
+        if "chunked" in cabeceras.get("transfer-encoding", "").lower():
+            while True:
+                largo = int((await leer_linea(reader)).split(b";", 1)[0].strip(), 16)
+                if largo == 0:
+                    break
+                if largo < 0 or len(respuesta) + largo > MAX_RESPONSE_BYTES:
+                    raise ValueError("Respuesta muy grande; reduce los tokens")
+                respuesta.extend(await leer_exactos(reader, largo))
+                if bytes(await leer_exactos(reader, 2)) != b"\r\n":
+                    raise ValueError("Bloque HTTP invalido")
+        elif "content-length" in cabeceras:
+            largo = int(cabeceras["content-length"])
+            if largo < 0 or largo > MAX_RESPONSE_BYTES:
+                raise ValueError("Respuesta muy grande; reduce los tokens")
+            respuesta = await leer_exactos(reader, largo)
+        else:
+            while True:
+                bloque = await reader.read(1024)
+                if not bloque:
+                    break
+                if len(respuesta) + len(bloque) > MAX_RESPONSE_BYTES:
+                    raise ValueError("Respuesta muy grande; reduce los tokens")
+                respuesta.extend(bloque)
+        if codigo != 200:
+            raise RuntimeError("Ollama HTTP %d: %s" % (codigo, bytes(respuesta[:400]).decode("utf-8", "ignore")))
+        return json.loads(bytes(respuesta).decode())
+    finally:
+        await cerrar(writer)
+
+
+def preparar_chat(datos):
+    """Validar mensaje, historial y opciones personalizables del modelo."""
+    mensaje = str(datos.get("message", "")).strip()
+    modelo = str(datos.get("model", "")).strip()
+    if not mensaje or not modelo:
+        raise ValueError("Escribe un mensaje y selecciona un modelo")
+    if len(mensaje) > 1000:
+        raise ValueError("El mensaje admite hasta 1000 caracteres")
+    prompt = str(datos.get("system_prompt", SYSTEM_PROMPT))[:1600]
+    mensajes = [{"role": "system", "content": prompt}]
+    cantidad = max(0, min(12, int(datos.get("history_messages", DEFAULT_HISTORY_MESSAGES))))
+    historial = datos.get("history", [])
+    if isinstance(historial, list) and cantidad:
+        for item in historial[-cantidad:]:
+            if isinstance(item, dict) and item.get("role") in ("user", "assistant"):
+                mensajes.append({"role": item["role"], "content": str(item.get("content", ""))[:1000]})
+    mensajes.append({"role": "user", "content": mensaje})
+    return {"model": modelo[:100], "messages": mensajes, "stream": False,
+            "options": {
+                "temperature": max(0.0, min(2.0, float(datos.get("temperature", DEFAULT_TEMPERATURE)))),
+                "top_p": max(0.1, min(1.0, float(datos.get("top_p", DEFAULT_TOP_P)))),
+                "num_ctx": max(512, min(8192, int(datos.get("num_ctx", DEFAULT_NUM_CTX)))),
+                "num_predict": max(32, min(1024, int(datos.get("max_tokens", DEFAULT_MAX_TOKENS))))}}
+
+
+async def atender(reader, writer):
+    """Una tarea por navegador; permitir consultar estado durante una generacion."""
+    global CLIENTES, OLLAMA_OCUPADO, ULTIMO_ERROR
+    CLIENTES += 1
+    posee_ollama = False
+    try:
+        if CLIENTES > MAX_CLIENTS:
+            await responder(writer, 503, {"error": "Demasiadas conexiones; reintenta"})
+            return
+        metodo, ruta, cuerpo = await asyncio.wait_for(leer_solicitud(reader), HTTP_TIMEOUT_SECONDS)
+        if metodo == "GET" and ruta in ("/", "/index.html"):
+            await asyncio.wait_for(servir_html(writer), HTTP_TIMEOUT_SECONDS)
+            return
+        if metodo == "GET" and ruta == "/api/status":
+            await responder(writer, 200, {
+                "ip": direccion_actual(), "port": WEB_PORT, "mode": MODO_RED,
+                "connected": ESTACION.isconnected() if MODO_RED == "Wi-Fi" else True,
+                "busy": OLLAMA_OCUPADO, "free_memory": gc.mem_free(),
+                "last_error": ULTIMO_ERROR, "ollama_default_url": OLLAMA_DEFAULT_URL,
+                "usb_protocol": 1, "usb_active": USB_ACTIVO,
+                "timeout": OLLAMA_TIMEOUT_SECONDS,
+                "defaults": {"system_prompt": SYSTEM_PROMPT, "temperature": DEFAULT_TEMPERATURE,
+                             "top_p": DEFAULT_TOP_P, "num_ctx": DEFAULT_NUM_CTX,
+                             "max_tokens": DEFAULT_MAX_TOKENS, "history_messages": DEFAULT_HISTORY_MESSAGES}})
+            return
+        if metodo == "POST" and ruta == "/api/prepare":
+            # El modo USB utiliza EXACTAMENTE los ajustes y validaciones de
+            # esta placa, pero ejecuta Ollama desde la PC del navegador.
+            # Esta ruta no conecta a Ollama ni modifica configuracion persistente.
+            datos = json.loads(bytes(cuerpo).decode())
+            if not isinstance(datos, dict):
+                raise ValueError("La solicitud debe contener un objeto JSON")
+            await responder(writer, 200, {"request": preparar_chat(datos)})
+            return
+        if metodo == "POST" and ruta in ("/api/models", "/api/chat"):
+            datos = json.loads(bytes(cuerpo).decode())
+            if not isinstance(datos, dict):
+                raise ValueError("La solicitud debe contener un objeto JSON")
+            if OLLAMA_OCUPADO:
+                await responder(writer, 503, {"error": "Ollama esta trabajando. Espera a que termine."})
+                return
+            # Una sola consulta al modelo a la vez para proteger memoria.
+            OLLAMA_OCUPADO = True
+            posee_ollama = True
+            direccion = datos.get("ollama_url", OLLAMA_DEFAULT_URL)
+            if ruta == "/api/models":
+                resultado = await asyncio.wait_for(peticion_ollama(direccion, "/api/tags"), MODELS_TIMEOUT_SECONDS)
+                modelos = [m.get("name", m.get("model", "")) for m in resultado.get("models", [])]
+                await responder(writer, 200, {"models": [m for m in modelos if m]})
+            else:
+                print("Generando con:", datos.get("model"))
+                resultado = await asyncio.wait_for(peticion_ollama(direccion, "/api/chat", preparar_chat(datos)), OLLAMA_TIMEOUT_SECONDS)
+                texto = resultado.get("message", {}).get("content", "")
+                if not texto:
+                    texto = "El modelo no devolvio texto. Prueba otro modelo o aumenta los tokens."
+                await responder(writer, 200, {"reply": texto})
+                print("Respuesta enviada.")
+            ULTIMO_ERROR = ""
+            return
+        await responder(writer, 404, {"error": "Ruta inexistente"})
+    except Exception as error:
+        # No dejar que el error de una solicitud termine el servidor entero.
+        ULTIMO_ERROR = str(error) or type(error).__name__
+        codigo = 502
+        if isinstance(error, asyncio.TimeoutError):
+            codigo = 504
+            ULTIMO_ERROR = "Tiempo agotado. Revisa IP, firewall, red y velocidad del modelo."
+        elif isinstance(error, OverflowError):
+            codigo = 413
+        elif isinstance(error, ValueError):
+            codigo = 400
+        print("Error:", ULTIMO_ERROR)
+        try:
+            await asyncio.wait_for(responder(writer, codigo, {"error": ULTIMO_ERROR[:500]}), 3)
+        except Exception:
+            pass
+    finally:
+        if posee_ollama:
+            OLLAMA_OCUPADO = False
+        CLIENTES -= 1
+        await cerrar(writer)
+        gc.collect()
+
+
+async def supervisar():
+    """Mostrar actividad y reintentar Wi-Fi perdido sin reiniciar el servidor."""
+    ultima_reconexion = time.ticks_ms()
+    contador = 0
+    while True:
+        await asyncio.sleep(5)
+        contador += 1
+        if MODO_RED == "Wi-Fi" and not ESTACION.isconnected():
+            if time.ticks_diff(time.ticks_ms(), ultima_reconexion) >= 15000:
+                ultima_reconexion = time.ticks_ms()
+                print("Wi-Fi desconectado. Reintentando...")
+                try:
+                    ESTACION.disconnect()
+                    if WIFI_PASSWORD:
+                        ESTACION.connect(WIFI_SSID, WIFI_PASSWORD)
+                    else:
+                        ESTACION.connect(WIFI_SSID)
+                except Exception as error:
+                    print("Reconexion:", error)
+        if contador % 6 == 0:
+            gc.collect()
+            print("Servidor activo | Ollama ocupado:", OLLAMA_OCUPADO,
+                  "| clientes:", CLIENTES, "| RAM libre:", gc.mem_free())
+
+
+def usb_emitir(datos):
+    """Tramas ASCII: el hexadecimal evita mezclar UTF-8 con el protocolo REPL."""
+    print(USB_PREFIX + json.dumps(datos))
+
+
+class LectorUSB:
+    """Adaptar una solicitud USB al mismo lector de solicitudes HTTP."""
+    def __init__(self, datos):
+        self.datos = datos
+        self.posicion = 0
+
+    async def read(self, cantidad):
+        parte = self.datos[self.posicion:self.posicion + cantidad]
+        self.posicion += len(parte)
+        return parte
+
+
+class EscritorUSB:
+    """Enviar la respuesta HTTP por USB en bloques pequenos, sin copiarla entera."""
+    def __init__(self, identificador):
+        self.identificador = identificador
+        self.secuencia = 0
+
+    def write(self, datos):
+        # .write solo encola el bloque actual; .drain lo transmite cooperativamente.
+        self.pendiente = datos
+
+    async def drain(self):
+        datos = getattr(self, "pendiente", b"")
+        for posicion in range(0, len(datos), 128):
+            usb_emitir({"kind": "data", "id": self.identificador, "seq": self.secuencia,
+                        "hex": binascii.hexlify(datos[posicion:posicion + 128]).decode()})
+            self.secuencia += 1
+            await asyncio.sleep_ms(2)
+        self.pendiente = b""
+
+    def close(self):
+        usb_emitir({"kind": "end", "id": self.identificador, "seq": self.secuencia})
+
+    async def wait_closed(self):
+        pass
+
+
+async def procesar_usb(identificador, datos):
+    global USB_OCUPADO
+    try:
+        await atender(LectorUSB(datos), EscritorUSB(identificador))
+    finally:
+        USB_OCUPADO = False
+        gc.collect()
+
+
+async def escuchar_usb():
+    """Leer consola sin bloquear Wi-Fi. Nunca abrir un segundo puerto USB.
+
+    El IDE manda fragmentos de 48 bytes y espera un ACK por fragmento: asi no
+    desborda el buffer de entrada. Se conserva Ctrl+C para detener el programa.
+    Un programa que tambien lee sys.stdin debe integrar su lectura con esta.
+    """
+    global USB_ACTIVO, USB_OCUPADO
+    poll = select.poll()
+    poll.register(sys.stdin, select.POLLIN)
+    USB_ACTIVO = True
+    linea = ""
+    solicitud = bytearray()
+    identificador = None
+    secuencia = 0
+    ultimo = time.ticks_ms()
+    print("Web por USB lista. Pulsa Web por USB en EspWebStudio.")
+    while True:
+        # Descartar transferencias incompletas sin afectar el servidor Wi-Fi.
+        if identificador is not None and time.ticks_diff(time.ticks_ms(), ultimo) > 15000:
+            solicitud = bytearray()
+            identificador = None
+            secuencia = 0
+        if poll.poll(0):
+            caracter = sys.stdin.read(1)
+            if caracter == "\n":
+                texto = linea.rstrip("\r")
+                linea = ""
+                if not texto.startswith(USB_PREFIX):
+                    continue
+                trama = {}
+                try:
+                    trama = json.loads(texto[len(USB_PREFIX):])
+                    nuevo_id = str(trama.get("id", ""))
+                    indice = int(trama.get("seq", -1))
+                    if not nuevo_id or len(nuevo_id) > 40 or trama.get("kind") != "request":
+                        raise ValueError("Trama USB invalida")
+                    if USB_OCUPADO:
+                        raise ValueError("USB ocupado; espera la respuesta")
+                    if indice == 0:
+                        identificador = nuevo_id
+                        solicitud = bytearray()
+                        secuencia = 0
+                    if nuevo_id != identificador or indice != secuencia:
+                        raise ValueError("Secuencia USB incorrecta")
+                    bloque = binascii.unhexlify(trama.get("hex", ""))
+                    if len(bloque) > 48 or len(solicitud) + len(bloque) > MAX_REQUEST_BYTES + 4096:
+                        raise ValueError("Solicitud USB demasiado grande")
+                    solicitud.extend(bloque)
+                    secuencia += 1
+                    ultimo = time.ticks_ms()
+                    usb_emitir({"kind": "ack", "id": identificador, "seq": indice})
+                    if trama.get("last"):
+                        USB_OCUPADO = True
+                        asyncio.create_task(procesar_usb(identificador, solicitud))
+                        solicitud = bytearray()
+                        identificador = None
+                        secuencia = 0
+                except Exception as error:
+                    usb_emitir({"kind": "error", "id": str(trama.get("id", "")), "error": str(error)})
+                    solicitud = bytearray()
+                    identificador = None
+                    secuencia = 0
+            elif caracter:
+                linea += caracter
+                if len(linea) > 512:
+                    linea = ""
+            # Ceder el control sin dormir entre caracteres pendientes.
+            await asyncio.sleep_ms(0)
+        else:
+            await asyncio.sleep_ms(10)
+
+
+async def principal():
+    # Iniciar USB ANTES de esperar Wi-Fi: el acceso USB no depende de su red.
+    tarea_usb = asyncio.create_task(escuchar_usb())
+    servidor = None
+    try:
+        try:
+            await conectar_wifi_o_iniciar_ap()
+            servidor = await asyncio.start_server(atender, "0.0.0.0", WEB_PORT, backlog=2)
+            print("Servidor iniciado:", url_web(direccion_actual()))
+        except Exception as error:
+            print("Wi-Fi/HTTP no disponible; el USB sigue activo:", error)
+        print("Esperar solicitudes es normal. Ctrl+C detiene el programa.")
+        await supervisar()
+    finally:
+        tarea_usb.cancel()
+        if servidor is not None:
+            servidor.close()
+            await servidor.wait_closed()
+
+
+# 4. ARRANQUE: no reiniciar silenciosamente ante una falla real.
+# Se imprime el traceback para poder identificar firmware/memoria/puerto.
+try:
+    asyncio.run(principal())
+except KeyboardInterrupt:
+    print("Programa detenido desde Thonny o con Ctrl+C.")
+except Exception as error:
+    sys.print_exception(error)
+    print("Revisa el error anterior y reinicia la placa con RESET.")
+finally:
+    asyncio.new_event_loop()
+    gc.collect()
+</script>
+
 <script type="text/x-micropython" id="example-iot-telemetry">
 # EspWebStudio: servicio
 # Página y API JSON de telemetría local (ADC GPIO0, RSSI y RAM).
@@ -2465,7 +3081,7 @@ sys.modules.setdefault("ubinascii", binascii)
 
 <script>
 /* ============================================================================
-   EspWebStudio v3.6.1 — IDE MicroPython para ESP32
+   EspWebStudio v3.7.0 — IDE MicroPython para ESP32
    ---------------------------------------------------------------------------
    100% cliente. Sin backend. Web Serial API + CodeMirror 5 + xterm.js.
    Licencia: MIT
@@ -2570,8 +3186,8 @@ function applyTheme(theme) {
 applyTheme(settings.theme);
 
 const UI_TEXT = {
-  es:{connect:'Conectar',run:'Ejecutar',downloadPy:'Descargar .py',dataPrivacy:'Datos y privacidad',dataHint:'Los bloques y borradores de Código, incluidas las claves Wi-Fi que contengan, se guardan aquí. Descarga el .py o exporta el JSON antes de borrar datos.',viewPrivacy:'Ver privacidad',clearLocalData:'Borrar datos guardados',docsLicense:'Licencia MIT',docsAbout:'Acerca de',docsAi:'Uso de IA',docsPrivacy:'Privacidad',docsIot:'Guía IoT',save:'Guardar',stop:'Detener',firmware:'Firmware',examples:'Ejemplos',blocks:'Bloques',code:'Código',accessibility:'Accesibilidad',interfaceSize:'Tamaño de interfaz',highContrast:'Contraste alto',reduceMotion:'Reducir animaciones',dyslexiaFont:'Tipografía para dislexia',dyslexiaHint:'Usa OpenDyslexic en la interfaz, el código y los bloques; puedes desactivarla cuando quieras.',boardProfile:'Perfil:',blocksHelp:'Ayuda de bloques',a11yHint:'La navegación por teclado muestra el foco. Pulsa Alt+A para abrir este menú y Esc para cerrarlo.',done:'Listo',settings:'Ajustes',appearance:'Apariencia',language:'Idioma de la interfaz',theme:'Tema',editorFont:'Tamaño de fuente del editor',tabSize:'Tamaño de pestaña',connection:'Conexión',editor:'Editor',cancel:'Cancelar',examplesTitle:'Ejemplos ESP32 / MicroPython',examplesIntro:'Cada ejemplo se abre en la vista actual, Código o Bloques. Cambia SSID y clave antes de conectar Wi-Fi. Si no hay placa y el programa no usa hardware, Ejecutar usa Python del navegador.',searchExamples:'Buscar ejemplos',close:'Cerrar',blocksTitle:'Estudio visual · MicroPython ESP32',viewExamples:'Ver ejemplos',viewCode:'Ver Código del mismo proyecto',openCode:'Abrir en Código',openBlocks:'Abrir en Bloques',visualGroup:'Proyectos visuales',codeGroup:'Ejemplos en Python',groupStart:'Primeros pasos y consola',groupGames:'Conversación y juegos',groupHardware:'GPIO, sensores y energía',groupWifi:'Wi-Fi y servicios',groupIot:'Proyectos IoT',groupRadio:'BLE y ESP-NOW',groupData:'Archivos y datos',groupMore:'Otros proyectos',connectionGuide:'¿Cómo se conectan? Arrastra bloques desde las categorías. Encaja muescas para ordenar instrucciones. Coloca bloques redondos en huecos de la misma forma. Los bloques «hacer» contienen otras instrucciones. Toca un bloque para ver su ayuda; clic derecho permite comentar o duplicar.'},
-  en:{connect:'Connect',run:'Run',downloadPy:'Download .py',dataPrivacy:'Data and privacy',dataHint:'Blocks and Code drafts (including Wi-Fi passwords) are stored in this browser. Download .py or export JSON before clearing data.',viewPrivacy:'View privacy',clearLocalData:'Clear saved data',docsLicense:'MIT license',docsAbout:'About',docsAi:'AI use',docsPrivacy:'Privacy',docsIot:'IoT guide',save:'Save',stop:'Stop',firmware:'Firmware',examples:'Examples',blocks:'Blocks',code:'Code',accessibility:'Accessibility',interfaceSize:'Interface size',highContrast:'High contrast',reduceMotion:'Reduce motion',dyslexiaFont:'Dyslexia friendly font',dyslexiaHint:'Use OpenDyslexic in the interface, code and blocks; switch it off at any time.',boardProfile:'Board:',blocksHelp:'Block help',a11yHint:'Keyboard navigation highlights focus. Press Alt+A to open this menu and Esc to close it.',done:'Done',settings:'Settings',appearance:'Appearance',language:'Interface language',theme:'Theme',editorFont:'Editor font size',tabSize:'Tab size',connection:'Connection',editor:'Editor',cancel:'Cancel',examplesTitle:'ESP32 / MicroPython examples',examplesIntro:'Each example opens in the current Code or Blocks view. Set SSID and password before using Wi-Fi. Without a board, Run uses browser Python for code that does not need hardware.',searchExamples:'Search examples',close:'Close',blocksTitle:'Visual studio · MicroPython ESP32',viewExamples:'Browse examples',viewCode:'View Code in this project',openCode:'Open in Code',openBlocks:'Open in Blocks',visualGroup:'Visual projects',codeGroup:'Python examples',groupStart:'Getting started and console',groupGames:'Conversation and games',groupHardware:'GPIO, sensors and power',groupWifi:'Wi-Fi and services',groupIot:'IoT projects',groupRadio:'BLE and ESP-NOW',groupData:'Files and data',groupMore:'Other projects',connectionGuide:'How do blocks connect? Drag blocks from the categories. Snap notches together to order statements. Put round value blocks into matching sockets. The “do” blocks contain statements. Select a block for help; right click to comment or duplicate.'}
+  es:{usbWeb:'Web por USB',connect:'Conectar',run:'Ejecutar',downloadPy:'Descargar .py',dataPrivacy:'Datos y privacidad',dataHint:'Los bloques y borradores de Código, incluidas las claves Wi-Fi que contengan, se guardan aquí. Descarga el .py o exporta el JSON antes de borrar datos.',viewPrivacy:'Ver privacidad',clearLocalData:'Borrar datos guardados',docsLicense:'Licencia MIT',docsAbout:'Acerca de',docsAi:'Uso de IA',docsPrivacy:'Privacidad',docsIot:'Guía IoT',save:'Guardar',stop:'Detener',firmware:'Firmware',examples:'Ejemplos',blocks:'Bloques',code:'Código',accessibility:'Accesibilidad',interfaceSize:'Tamaño de interfaz',highContrast:'Contraste alto',reduceMotion:'Reducir animaciones',dyslexiaFont:'Tipografía para dislexia',dyslexiaHint:'Usa OpenDyslexic en la interfaz, el código y los bloques; puedes desactivarla cuando quieras.',boardProfile:'Perfil:',blocksHelp:'Ayuda de bloques',a11yHint:'La navegación por teclado muestra el foco. Pulsa Alt+A para abrir este menú y Esc para cerrarlo.',done:'Listo',settings:'Ajustes',appearance:'Apariencia',language:'Idioma de la interfaz',theme:'Tema',editorFont:'Tamaño de fuente del editor',tabSize:'Tamaño de pestaña',connection:'Conexión',editor:'Editor',cancel:'Cancelar',examplesTitle:'Ejemplos ESP32 / MicroPython',examplesIntro:'Cada ejemplo se abre en la vista actual, Código o Bloques. Cambia SSID y clave antes de conectar Wi-Fi. Si no hay placa y el programa no usa hardware, Ejecutar usa Python del navegador.',searchExamples:'Buscar ejemplos',close:'Cerrar',blocksTitle:'Estudio visual · MicroPython ESP32',viewExamples:'Ver ejemplos',viewCode:'Ver Código del mismo proyecto',openCode:'Abrir en Código',openBlocks:'Abrir en Bloques',visualGroup:'Proyectos visuales',codeGroup:'Ejemplos en Python',groupStart:'Primeros pasos y consola',groupGames:'Conversación y juegos',groupHardware:'GPIO, sensores y energía',groupWifi:'Wi-Fi y servicios',groupIot:'Proyectos IoT',groupRadio:'BLE y ESP-NOW',groupData:'Archivos y datos',groupMore:'Otros proyectos',connectionGuide:'¿Cómo se conectan? Arrastra bloques desde las categorías. Encaja muescas para ordenar instrucciones. Coloca bloques redondos en huecos de la misma forma. Los bloques «hacer» contienen otras instrucciones. Toca un bloque para ver su ayuda; clic derecho permite comentar o duplicar.'},
+  en:{usbWeb:'Web over USB',connect:'Connect',run:'Run',downloadPy:'Download .py',dataPrivacy:'Data and privacy',dataHint:'Blocks and Code drafts (including Wi-Fi passwords) are stored in this browser. Download .py or export JSON before clearing data.',viewPrivacy:'View privacy',clearLocalData:'Clear saved data',docsLicense:'MIT license',docsAbout:'About',docsAi:'AI use',docsPrivacy:'Privacy',docsIot:'IoT guide',save:'Save',stop:'Stop',firmware:'Firmware',examples:'Examples',blocks:'Blocks',code:'Code',accessibility:'Accessibility',interfaceSize:'Interface size',highContrast:'High contrast',reduceMotion:'Reduce motion',dyslexiaFont:'Dyslexia friendly font',dyslexiaHint:'Use OpenDyslexic in the interface, code and blocks; switch it off at any time.',boardProfile:'Board:',blocksHelp:'Block help',a11yHint:'Keyboard navigation highlights focus. Press Alt+A to open this menu and Esc to close it.',done:'Done',settings:'Settings',appearance:'Appearance',language:'Interface language',theme:'Theme',editorFont:'Editor font size',tabSize:'Tab size',connection:'Connection',editor:'Editor',cancel:'Cancel',examplesTitle:'ESP32 / MicroPython examples',examplesIntro:'Each example opens in the current Code or Blocks view. Set SSID and password before using Wi-Fi. Without a board, Run uses browser Python for code that does not need hardware.',searchExamples:'Search examples',close:'Close',blocksTitle:'Visual studio · MicroPython ESP32',viewExamples:'Browse examples',viewCode:'View Code in this project',openCode:'Open in Code',openBlocks:'Open in Blocks',visualGroup:'Visual projects',codeGroup:'Python examples',groupStart:'Getting started and console',groupGames:'Conversation and games',groupHardware:'GPIO, sensors and power',groupWifi:'Wi-Fi and services',groupIot:'IoT projects',groupRadio:'BLE and ESP-NOW',groupData:'Files and data',groupMore:'Other projects',connectionGuide:'How do blocks connect? Drag blocks from the categories. Snap notches together to order statements. Put round value blocks into matching sockets. The “do” blocks contain statements. Select a block for help; right click to comment or duplicate.'}
 };
 const UI_LITERAL_EN={
   'Explorador':'Explorer','Sin conexión':'Disconnected','Desconectado':'Disconnected',
@@ -2689,6 +3305,7 @@ class SerialManager {
     this.rawOnStdout = null;
     this.rawAckPending = false;
     this.rawStreamDecoder = null;
+    this.outputFilter = null; // USB web protocol filter, optional
     this.listeners = { data: [], state: [] };
   }
   on(evt, fn) { (this.listeners[evt] ||= []).push(fn); return this; }
@@ -2782,7 +3399,8 @@ class SerialManager {
         resolve?.({ stdout: decodeRawText(stdout), stderr: decodeRawText(stderr) });
       }
     } else {
-      this.emit('data', text);
+      const visible=this.outputFilter?this.outputFilter(text):text;
+      if(visible)this.emit('data', visible);
     }
   }
 
@@ -2799,11 +3417,11 @@ class SerialManager {
       const bytes = Uint8Array.from(this.rawBuffer.slice(0, end), ch => ch.charCodeAt(0));
       this.rawBuffer = this.rawBuffer.slice(end); // libera memoria durante servicios indefinidos
       const chunk = this.rawStreamDecoder.decode(bytes, { stream: split < 0 });
-      if (chunk) this.rawOnStdout(chunk);
+      if (chunk) {const visible=this.outputFilter?this.outputFilter(chunk):chunk;if(visible)this.rawOnStdout(visible);}
     }
     if (split >= 0) {
       const tail = this.rawStreamDecoder.decode();
-      if (tail) this.rawOnStdout(tail);
+      if (tail) {const visible=this.outputFilter?this.outputFilter(tail):tail;if(visible)this.rawOnStdout(visible);}
     }
   }
 
@@ -2822,6 +3440,7 @@ class SerialManager {
   /* Aborta una ejecución en curso (Raw REPL) y devuelve el control al REPL. */
   async abortRaw() {
     if (this.mode !== 'raw') return;
+    this.emit('service-stop');
     await this.write('\x02'); // Ctrl-B: salir de Raw REPL
     await sleep(60);
     await this.write('\x03'); // Ctrl-C: interrumpir el programa
@@ -2840,6 +3459,7 @@ class SerialManager {
   async rawExec(code, timeoutMs = 8000, { onStdout } = {}) {
     if (!this.connected) throw new Error('Sin conexión');
     if (this.mode === 'raw') throw new Error('Ya hay otra operación serie en curso');
+    if(this.canRawExec&&!this.canRawExec())throw new Error('Detén la web USB antes de usar archivos o el REPL');
     this.mode = 'raw';
     this.rawStage = 'input';
     this.rawPaste = false;
@@ -2923,7 +3543,7 @@ class SerialManager {
     }
   }
 
-  async interrupt()  { if (this.connected) await this.write('\x03'); }
+  async interrupt()  { this.emit('service-stop');if (this.connected) await this.write('\x03'); }
   async softReset()  {
     if (!this.connected) return;
     await this.write('\x03'); await sleep(80);
@@ -2935,6 +3555,258 @@ class SerialManager {
 
 const serial = new SerialManager();
 let firmwareBusy = false;
+const USB_CHAT_HTML="<!doctype html>\n<html lang=\"es\">\n<head>\n<meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\n<title>ESP32 · Chat con Ollama<\/title>\n<style>\n:root{color-scheme:dark;--bg:#101827;--panel:#192438;--text:#edf3ff;--muted:#b5c4db;--line:#3b4e68;--accent:#78d9ce}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:16px system-ui,sans-serif}main{max-width:1100px;margin:auto;padding:24px}h1{font-size:26px;margin:0 0 8px}p{line-height:1.5}.muted{color:var(--muted)}.grid{display:grid;grid-template-columns:340px 1fr;gap:20px}.panel{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:20px}label{display:block;margin:15px 0 6px}input,select,textarea,button{font:inherit;border-radius:8px}input,select,textarea{width:100%;padding:10px;border:1px solid var(--line);background:var(--bg);color:var(--text)}textarea{resize:vertical}button{padding:11px 15px;background:var(--accent);color:#092522;border:0;cursor:pointer;font-weight:650}button.secondary{background:#34465e;color:var(--text)}button:disabled{opacity:.5;cursor:wait}button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{outline:3px solid var(--accent);outline-offset:2px}.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.small{font-size:13px}#modelsStatus,#sendStatus{min-height:24px;overflow-wrap:anywhere}#messages{height:430px;overflow:auto;padding:8px 0}.bubble{padding:14px;border-radius:12px;margin:10px 0;background:#26364e;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.55}.bubble.user{border-left:4px solid var(--accent)}.bubble strong{display:block;font-size:13px;color:var(--accent);margin-bottom:6px}summary{cursor:pointer;margin-top:20px}.pair{display:grid;grid-template-columns:1fr 1fr;gap:12px}.error{color:#ffb8b8}header{margin-bottom:22px}#net{overflow-wrap:anywhere}@media(max-width:760px){main{padding:14px}.grid{grid-template-columns:1fr}#messages{height:350px}}@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}\n<\/style><\/head>\n<body><main>\n<header><h1>Chat con Ollama<\/h1><div class=\"muted\">ESP32-C3 Super Mini · El modelo se ejecuta en tu computadora.<\/div><p id=\"net\" class=\"small\" role=\"status\">Consultando el ESP32…<\/p><\/header>\n<div class=\"grid\">\n<section class=\"panel\" aria-label=\"Configuración\">\n<label for=\"url\">Dirección de Ollama<\/label><input id=\"url\" type=\"text\" placeholder=\"http://192.168.1.50:11434\" autocomplete=\"off\" spellcheck=\"false\">\n<p class=\"small muted\">Usa la IP de la PC en la red local. Ollama debe aceptar conexiones desde la red y el firewall debe permitir el puerto 11434.<\/p>\n<button id=\"loadModels\" type=\"button\">Conectar y cargar modelos<\/button>\n<p id=\"modelsStatus\" class=\"small\" role=\"status\" aria-live=\"polite\"><\/p>\n<label for=\"model\">Modelo instalado<\/label><select id=\"model\" disabled><option value=\"\">Conecta para cargar los modelos<\/option><\/select>\n<details><summary>Personalizar el asistente<\/summary>\n<label for=\"prompt\">Instrucciones del asistente (system prompt)<\/label><textarea id=\"prompt\" rows=\"6\" maxlength=\"1600\"><\/textarea>\n<div class=\"pair\"><div><label for=\"temperature\">Temperatura<\/label><input id=\"temperature\" type=\"number\" min=\"0\" max=\"2\" step=\"0.1\" value=\"0.7\"><\/div><div><label for=\"top_p\">Top P<\/label><input id=\"top_p\" type=\"number\" min=\"0.1\" max=\"1\" step=\"0.05\" value=\"0.9\"><\/div><\/div>\n<div class=\"pair\"><div><label for=\"num_ctx\">Contexto<\/label><input id=\"num_ctx\" type=\"number\" min=\"512\" max=\"8192\" step=\"512\" value=\"2048\"><\/div><div><label for=\"max_tokens\">Máximo de tokens<\/label><input id=\"max_tokens\" type=\"number\" min=\"32\" max=\"1024\" step=\"1\" value=\"300\"><\/div><\/div>\n<label for=\"history_messages\">Mensajes previos enviados<\/label><input id=\"history_messages\" type=\"number\" min=\"0\" max=\"12\" value=\"8\">\n<p class=\"small muted\">Más contexto y tokens pueden aumentar el tiempo de respuesta. El historial se conserva durante esta sesión de la página.<\/p>\n<\/details>\n<\/section>\n<section class=\"panel\" aria-label=\"Conversación\">\n<div class=\"row\"><strong>Conversación<\/strong><button class=\"secondary\" id=\"clear\" type=\"button\">Nueva conversación<\/button><\/div>\n<div id=\"messages\" role=\"log\" aria-live=\"polite\"><\/div>\n<form id=\"chatForm\"><label for=\"message\">Tu mensaje<\/label><textarea id=\"message\" rows=\"3\" maxlength=\"1000\" placeholder=\"Escribe tu pregunta…\" required><\/textarea>\n<p class=\"small muted\">Enter para enviar · Mayús + Enter para un salto de línea.<\/p>\n<button id=\"send\" disabled type=\"submit\">Enviar<\/button><p id=\"sendStatus\" class=\"small\" role=\"status\" aria-live=\"polite\"><\/p><\/form>\n<\/section><\/div>\n<p class=\"small muted\">Abre esta página desde la dirección del ESP32, con el puerto 8080. El AP de respaldo permite abrir la web, pero la PC con Ollama debe ser accesible desde esa red. Algunas redes escolares aíslan los dispositivos.<\/p>\n<\/main>\n<script>\n'use strict';\n// No se necesita Internet ni librerías externas. La web consulta al ESP32,\n// que reenvía /api/models a /api/tags de Ollama (sin CORS en el navegador).\nconst $ = id => document.getElementById(id);\nlet history = [], busy = false, loadedUrl = '', timeout = 180, monitoring = false;\nconst settings = ['prompt','temperature','top_p','num_ctx','max_tokens','history_messages'];\nfunction localGet(key){try{return localStorage.getItem(key)}catch(e){return null}}\nfunction localSet(key,value){try{localStorage.setItem(key,value)}catch(e){}}\nfunction show(id,text,error=false){$(id).textContent=text;$(id).classList.toggle('error',error)}\nfunction setBusy(value){busy=value;$('loadModels').disabled=value;$('clear').disabled=value;$('model').disabled=value||!loadedUrl;$('url').disabled=value;settings.forEach(id=>$(id).disabled=value);$('send').disabled=value||!$('model').value||loadedUrl!==$('url').value.trim();}\nfunction addMessage(role,text){const box=document.createElement('div');box.className='bubble '+role;const title=document.createElement('strong');title.textContent=role==='user'?'Tú':'Asistente';const content=document.createElement('span');content.textContent=text;box.append(title,content);$('messages').appendChild(box);$('messages').scrollTop=$('messages').scrollHeight;}\nasync function api(path,data,seconds){\n  const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),seconds*1000);\n  try{\n    const response=await fetch(path,{method:data===undefined?'GET':'POST',headers:data===undefined?{}:{'Content-Type':'application/json'},body:data===undefined?undefined:JSON.stringify(data),signal:controller.signal,cache:'no-store'});\n    let result;try{result=await response.json()}catch(e){throw new Error('Respuesta incompleta del ESP32. Revisa la conexión y la consola.')}\n    if(!response.ok)throw new Error(result.error||'Error HTTP '+response.status);return result;\n  }catch(error){if(error.name==='AbortError')throw new Error('Tiempo de espera agotado. El ESP32 o el modelo no respondieron dentro del límite.');if(error instanceof TypeError)throw new Error('No se pudo comunicar con el ESP32. Revisa la red y su dirección.');throw error;}finally{clearTimeout(timer)}\n}\nfunction persist(){localSet('esp32OllamaUrl',$('url').value.trim());localSet('esp32OllamaModel',$('model').value);const data={};settings.forEach(id=>data[id]=$(id).value);localSet('esp32OllamaSettings',JSON.stringify(data));}\nasync function loadModels(){\n  const url=$('url').value.trim();if(!url){show('modelsStatus','Escribe la IP de la PC con Ollama.',true);return}\n  setBusy(true);show('modelsStatus','Consultando los modelos instalados…');loadedUrl='';\n  try{\n    const result=await api('/api/models',{ollama_url:url},30);$('model').replaceChildren();\n    for(const name of result.models){const option=document.createElement('option');option.value=name;option.textContent=name;$('model').appendChild(option)}\n    if(!result.models.length){const option=document.createElement('option');option.value='';option.textContent='No hay modelos instalados';$('model').appendChild(option);show('modelsStatus','Instala un modelo en la PC con Ollama y vuelve a cargar.',true);return}\n    const saved=localGet('esp32OllamaModel');if(result.models.includes(saved))$('model').value=saved;\n    loadedUrl=url;persist();show('modelsStatus',result.models.length+' modelo(s) disponible(s).');\n  }catch(error){$('model').replaceChildren();const option=document.createElement('option');option.value='';option.textContent='No se pudo cargar la lista';$('model').appendChild(option);show('modelsStatus',error.message,true)}finally{setBusy(false)}\n}\n$('loadModels').addEventListener('click',loadModels);\n$('url').addEventListener('input',()=>{loadedUrl='';$('model').disabled=true;$('send').disabled=true;show('modelsStatus','Carga los modelos de la nueva dirección.')});\n$('model').addEventListener('change',()=>{persist();setBusy(false)});settings.forEach(id=>$(id).addEventListener('change',persist));\n$('clear').addEventListener('click',()=>{history=[];$('messages').replaceChildren();show('sendStatus','Conversación reiniciada.')});\n$('chatForm').addEventListener('submit',async event=>{\n  event.preventDefault();if(busy)return;\n  const message=$('message').value.trim();if(!message||!$('model').value||loadedUrl!==$('url').value.trim())return;\n  if(!$('chatForm').reportValidity())return;\n  const count=Number($('history_messages').value);\n  const data={ollama_url:loadedUrl,model:$('model').value,message,system_prompt:$('prompt').value,history:count?history.slice(-count):[],history_messages:count,temperature:Number($('temperature').value),top_p:Number($('top_p').value),num_ctx:Number($('num_ctx').value),max_tokens:Number($('max_tokens').value)};\n  // Medir bytes UTF-8, no caracteres, antes de enviar a la placa.\n  if(new TextEncoder().encode(JSON.stringify(data)).length>16000){show('sendStatus','Reduce los mensajes previos o el tamaño del mensaje para no superar la memoria disponible.',true);return}\n  persist();setBusy(true);const start=Date.now();show('sendStatus','Ollama está generando una respuesta…');\n  const ticker=setInterval(()=>show('sendStatus','Ollama está trabajando… '+Math.floor((Date.now()-start)/1000)+' s. La primera respuesta puede tardar mientras carga el modelo.'),1000);\n  try{\n    const result=await api('/api/chat',data,timeout+15);\n    addMessage('user',message);addMessage('assistant',result.reply);\n    history.push({role:'user',content:message},{role:'assistant',content:result.reply});history=history.slice(-12);\n    $('message').value='';show('sendStatus','Respuesta recibida en '+Math.floor((Date.now()-start)/1000)+' s.');\n  }catch(error){show('sendStatus',error.message,true)}finally{clearInterval(ticker);setBusy(false);$('message').focus()}\n});\n$('message').addEventListener('keydown',event=>{if(event.key==='Enter'&&!event.shiftKey&&!event.isComposing){event.preventDefault();if(!busy)$('chatForm').requestSubmit()}});\n// Esta consulta puede responder aunque Ollama esté generando: prueba de actividad.\nasync function checkStatus(){\n  if(monitoring)return;monitoring=true;\n  try{const state=await api('/api/status',undefined,6);show('net','ESP32 activo · '+state.mode+' · '+state.ip+':'+state.port+' · RAM libre: '+Math.round(state.free_memory/1024)+' KB'+(state.busy?' · Consultando Ollama':''));}\n  catch(error){show('net','No se recibió el estado del ESP32. Revisa la conexión.',true)}finally{monitoring=false}\n}\nasync function init(){\n  try{\n    const state=await api('/api/status',undefined,10);timeout=state.timeout||180;\n    $('url').value=localGet('esp32OllamaUrl')||state.ollama_default_url;\n    let saved={};try{saved=JSON.parse(localGet('esp32OllamaSettings')||'{}')}catch(e){}\n    const defaults=state.defaults||{};for(const id of settings){const key=id==='prompt'?'system_prompt':id;if(saved[id]!==undefined)$(id).value=saved[id];else if(defaults[key]!==undefined)$(id).value=defaults[key]}\n    await checkStatus();await loadModels();\n  }catch(error){show('net',error.message+' Abre el HTML desde el ESP32, no como archivo local.',true)}\n  setInterval(checkStatus,15000);\n}\ninit();\n<\/script><\/body><\/html>\n";
+/* ---------- USB WEB TRANSPORT (same Web Serial connection as the IDE) ---------- */
+class UsbWebTransport {
+  constructor(serial) {
+    this.serial=serial;this.buffer='';this.pending=null;this.counter=0;
+    this.tail=Promise.resolve();this.busy=false;this.claimed=false;
+  }
+  feed(text) {
+    // Preserve ordinary console output; only consume complete protocol lines.
+    this.buffer+=text;let visible='';const prefix='@EWSUSB:';
+    while(this.buffer) {
+      const start=this.buffer.indexOf(prefix);
+      if(start<0) {
+        let keep=0;for(let n=1;n<prefix.length;n++)if(this.buffer.endsWith(prefix.slice(0,n)))keep=n;
+        visible+=this.buffer.slice(0,this.buffer.length-keep);
+        this.buffer=this.buffer.slice(this.buffer.length-keep);break;
+      }
+      visible+=this.buffer.slice(0,start);this.buffer=this.buffer.slice(start);
+      const end=this.buffer.indexOf('\n');
+      if(end<0){if(this.buffer.length>1024){visible+=this.buffer;this.buffer=''}break}
+      const line=this.buffer.slice(prefix.length,end).trim();this.buffer=this.buffer.slice(end+1);
+      try{this.frame(JSON.parse(line))}catch(error){visible+='[Trama USB inválida]\n'}
+    }
+    return visible;
+  }
+  reset(message='Conexión USB interrumpida') {
+    this.buffer='';this.claimed=false;
+    if(this.pending)this.fail(new Error(message));
+  }
+  fail(error) {
+    const pending=this.pending;if(!pending)return;
+    this.pending=null;clearTimeout(pending.timer);
+    pending.ack?.reject(error);pending.reject(error);
+  }
+  frame(frame) {
+    const pending=this.pending;if(!pending||frame.id!==pending.id)return;
+    if(frame.kind==='ack') {
+      if(pending.ack&&frame.seq===pending.ack.seq){this.claimed=true;const ack=pending.ack;pending.ack=null;ack.resolve()}
+    }else if(frame.kind==='data') {
+      if(frame.seq!==pending.seq||typeof frame.hex!=='string'||frame.hex.length>512||
+        !/^(?:[0-9a-f]{2})*$/i.test(frame.hex)) {this.fail(new Error('Respuesta USB fuera de secuencia'));return}
+      const bytes=Uint8Array.from(frame.hex.match(/../g)||[],x=>parseInt(x,16));
+      pending.size+=bytes.length;if(pending.size>131072){this.fail(new Error('La web supera el límite USB de 128 KB'));return}
+      pending.parts.push(bytes);pending.seq++;
+    }else if(frame.kind==='end') {
+      if(frame.seq!==pending.seq){this.fail(new Error('Respuesta USB incompleta'));return}
+      const bytes=new Uint8Array(pending.size);let offset=0;
+      pending.parts.forEach(part=>{bytes.set(part,offset);offset+=part.length});
+      this.pending=null;clearTimeout(pending.timer);pending.resolve(bytes);
+    }else if(frame.kind==='error')this.fail(new Error(frame.error||'Error USB'));
+  }
+  request(path,method='GET',body=null,seconds=195) {
+    const task=this.tail.catch(()=>{}).then(()=>this.exchange(path,method,body,seconds));
+    this.tail=task.catch(()=>{});return task;
+  }
+  async exchange(path,method,body,seconds) {
+    if(!this.serial.connected)throw new Error('Conecta la ESP32 al IDE');
+    if(this.serial.mode==='raw'&&this.serial.rawStage!=='result')throw new Error('Espera a que termine la transferencia del programa');
+    if(!['/','/index.html','/api/status','/api/models','/api/chat','/api/prepare'].includes(path))throw new Error('Ruta USB no permitida');
+    const data=body===null?'':JSON.stringify(body);const length=enc.encode(data).length;
+    if(length>16000)throw new Error('Solicitud demasiado grande; reduce el historial');
+    const bytes=enc.encode(`${method} ${path} HTTP/1.1\r\nContent-Type: application/json\r\nContent-Length: ${length}\r\n\r\n${data}`);
+    const id='web-'+(++this.counter);this.busy=true;
+    let resolve,reject;
+    const result=new Promise((yes,no)=>{resolve=yes;reject=no});
+    // Observe rejection immediately, including during the upload ACK loop.
+    result.catch(()=>{});
+    this.pending={id,resolve,reject,parts:[],seq:0,size:0,ack:null,
+      timer:setTimeout(()=>this.fail(new Error('La placa no responde por USB. Ejecuta el ejemplo Chat Ollama USB o reinicia main.py.')),seconds*1000)};
+    try {
+      for(let offset=0,seq=0;offset<bytes.length;offset+=48,seq++) {
+        const part=bytes.subarray(offset,offset+48);
+        const hex=Array.from(part,x=>x.toString(16).padStart(2,'0')).join('');
+        let ackTimer;
+        const ack=new Promise((yes,no)=>{
+          if(!this.pending){no(new Error('Transferencia USB interrumpida'));return}
+          ackTimer=setTimeout(()=>no(new Error('Sin confirmación USB. Comprueba que el servicio está ejecutándose.')),5000);
+          this.pending.ack={seq,resolve:yes,reject:no};
+        });
+        ack.catch(()=>{});
+        try{await this.serial.write('@EWSUSB:'+JSON.stringify({kind:'request',id,seq,hex,last:offset+48>=bytes.length})+'\n');await ack}
+        finally{clearTimeout(ackTimer)}
+      }
+      const received=await result;const text=new TextDecoder().decode(received);
+      const split=text.indexOf('\r\n\r\n');
+      if(split<0)throw new Error('Respuesta HTTP por USB incompleta');
+      const match=/^HTTP\/1\.[01] (\d{3})/.exec(text);if(!match)throw new Error('Respuesta HTTP USB inválida');
+      return {status:Number(match[1]),body:text.slice(split+4)};
+    }catch(error){this.fail(error);throw error}finally{this.busy=false}
+  }
+}
+const usbWeb=new UsbWebTransport(serial);
+serial.on('service-stop',()=>usbWeb.reset('Servicio detenido'));
+serial.canRawExec=()=>!usbWeb.claimed&&!usbWeb.pending;
+serial.outputFilter=text=>usbWeb.feed(text);
+serial.on('state',({connected})=>{if(!connected)usbWeb.reset('ESP32 desconectada')});
+let usbWebToken='',usbWebControllers=new Map(),usbPcBusy=false;
+const USB_WEB_STORAGE='espwebstudio.usb.web.v1';
+const USB_WEB_KEYS=['esp32OllamaUrl','esp32OllamaModel','esp32OllamaSettings'];
+
+// This function is injected before the board page's scripts, inside an opaque
+// sandbox. The board page cannot access the IDE DOM, editor or credentials.
+function usbFrameBootstrap(token,saved) {
+  let next=0;const pending=new Map();
+  const send=message=>parent.postMessage({...message,channel:'ews-usb-web',token},'*');
+  const values={...saved};
+  Object.defineProperty(window,'localStorage',{value:{
+    getItem:key=>values[key]??null,
+    setItem:(key,value)=>{values[key]=String(value);send({kind:'storage',key,value:String(value)})},
+    removeItem:key=>{delete values[key];send({kind:'storage',key,value:null})}
+  }});
+  window.fetch=(url,options={})=>new Promise((resolve,reject)=>{
+    const id=++next;const signal=options.signal;
+    const abort=()=>{pending.delete(id);send({kind:'cancel',id});reject(new DOMException('Aborted','AbortError'))};
+    if(signal?.aborted){abort();return}
+    pending.set(id,{resolve,reject,signal,abort});signal?.addEventListener('abort',abort,{once:true});
+    send({kind:'fetch',id,path:String(url),method:options.method||'GET',body:options.body||null});
+  });
+  addEventListener('message',event=>{
+    const msg=event.data;if(event.source!==parent||msg?.channel!=='ews-usb-web'||msg.token!==token)return;
+    const item=pending.get(msg.id);if(!item)return;
+    pending.delete(msg.id);item.signal?.removeEventListener('abort',item.abort);
+    if(msg.error)item.reject(new Error(msg.error));
+    else item.resolve(new Response(msg.body,{status:msg.status,headers:{'Content-Type':'application/json'}}));
+  });
+}
+function usbWebMessage(text,error=false) {
+  const el=$('#usbWebStatus');el.textContent=text;el.style.color=error?'var(--red)':'';
+}
+function closeUsbWeb() {
+  usbWebToken='';usbWebControllers.forEach(controller=>controller.abort());usbWebControllers.clear();
+  $('#usbWebFrame').srcdoc='';closeOverlay('usbWebOverlay');
+}
+async function openUsbWeb() {
+  if(usbPcBusy){usbWebMessage('Espera a que termine Ollama o cierra esta vista para cancelar.',true);return}
+  if(usbWebToken){usbWebToken='';usbWebControllers.forEach(c=>c.abort());usbWebControllers.clear();$('#usbWebFrame').srcdoc='';}
+  openOverlay('usbWebOverlay');refreshIcons();
+  if(!serial.connected){usbWebMessage('Conecta la ESP32 con el botón Conectar. Después ejecuta el ejemplo Chat Ollama USB.',true);return}
+  if(firmwareBusy){usbWebMessage('Espera a que termine la instalación del firmware.',true);return}
+  $('#usbWebLoad').disabled=true;usbWebMessage('Leyendo index.html de la placa por USB…');
+  try {
+    const response=await usbWeb.request('/','GET',null,30);
+    if(response.status!==200)throw new Error('La placa no tiene index.html disponible. Crea los archivos del chat y guarda index.html en la raíz.');
+    usbWebToken=Array.from(crypto.getRandomValues(new Uint8Array(16)),x=>x.toString(16).padStart(2,'0')).join('');
+    let saved={};try{saved=JSON.parse(localStorage.getItem(USB_WEB_STORAGE)||'{}')[$('#usbOllamaRoute').value]||{}}catch{}
+    const script='<script>('+usbFrameBootstrap.toString()+')('+JSON.stringify(usbWebToken)+','+
+      JSON.stringify(saved).replace(/</g,'\\u003c')+');</scr'+'ipt>';
+    // The CSP prevents the page from making its own external network requests.
+    // Only its fetch messages may cross the guarded parent bridge.
+    const csp='<meta http-equiv="Content-Security-Policy" content="default-src \'none\'; script-src \'unsafe-inline\'; style-src \'unsafe-inline\'; img-src data:; connect-src \'none\'; form-action \'none\'; base-uri \'none\'">';
+    let page=response.body;
+    const head=/<head(?:\s[^>]*)?>/i.exec(page);
+    if(head)page=page.slice(0,head.index+head[0].length)+csp+script+page.slice(head.index+head[0].length);
+    else page=csp+script+page;
+    $('#usbWebFrame').srcdoc=page;
+    usbWebMessage('Web cargada desde la ESP32 por USB. Ollama se consulta desde '+($('#usbOllamaRoute').value==='pc'?'esta PC.':'la red del ESP32.'));
+  }catch(error){usbWebMessage(error.message,true)}finally{$('#usbWebLoad').disabled=false}
+}
+async function usbJson(path,body=null,seconds=195) {
+  const response=await usbWeb.request(path,body===null?'GET':'POST',body,seconds);
+  const result=JSON.parse(response.body);
+  if(response.status!==200)throw new Error(result.error||'Error USB '+response.status);
+  return result;
+}
+async function browserOllama(url,path,body,signal) {
+  let target=new URL(url.includes('://')?url:'http://'+url);
+  if(!['http:','https:'].includes(target.protocol)||target.username||target.password)throw new Error('Dirección Ollama inválida');
+  if(!target.port)target.port='11434';target.pathname=path;target.search='';target.hash='';
+  let response;
+  try {
+    response=await fetch(target.href,{method:body===null?'GET':'POST',headers:body===null?{}:{'Content-Type':'application/json'},
+      body:body===null?undefined:JSON.stringify(body),signal,credentials:'omit',targetAddressSpace:'local'});
+  }catch(error){
+    if(error.name==='AbortError')throw error;
+    throw new Error('No se pudo acceder a Ollama desde esta PC. Comprueba que esté iniciado, permite la red local y configura OLLAMA_ORIGINS='+location.origin+'.');
+  }
+  const text=await response.text();
+  if(new TextEncoder().encode(text).length>32000)throw new Error('Respuesta demasiado grande; reduce los tokens');
+  if(!response.ok)throw new Error('Ollama HTTP '+response.status+': '+text.slice(0,300));
+  return JSON.parse(text);
+}
+async function handleUsbWebRequest(message,signal) {
+  if(!serial.connected)throw new Error('La placa USB se desconectó');
+  const allowed={'/api/status':'GET','/api/models':'POST','/api/chat':'POST'};
+  if(allowed[message.path]!==message.method)throw new Error('Ruta o método no permitido');
+  if(message.body&&typeof message.body!=='string')throw new Error('Cuerpo inválido');
+  if((message.body||'').length>16000)throw new Error('Solicitud demasiado grande');
+  const body=message.body?JSON.parse(message.body):null;
+  if(message.path==='/api/status') {
+    const status=await usbJson('/api/status',null,12);
+    status.mode='USB · '+status.mode;status.busy=status.busy||usbPcBusy;
+    if($('#usbOllamaRoute').value==='pc')status.ollama_default_url='http://localhost:11434';
+    return status;
+  }
+  if($('#usbOllamaRoute').value!=='pc')return usbJson(message.path,body);
+  if(usbPcBusy)throw new Error('Ollama está trabajando. Espera la respuesta.');
+  usbPcBusy=true;
+  try {
+    if(!body||typeof body!=='object')throw new Error('Datos del chat inválidos');
+    if(message.path==='/api/models') {
+      const data=await browserOllama(String(body.ollama_url||'http://localhost:11434'),'/api/tags',null,signal);
+      return {models:(data.models||[]).map(model=>model.name||model.model).filter(Boolean)};
+    }
+    // Prepare on the ESP32 so system prompt, limits and history stay identical.
+    const prepared=await usbJson('/api/prepare',body,20);
+    if(signal.aborted)throw new DOMException('Aborted','AbortError');
+    const result=await browserOllama(String(body.ollama_url||'http://localhost:11434'),'/api/chat',prepared.request,signal);
+    return {reply:result.message?.content||'El modelo no devolvió texto. Prueba otro modelo o aumenta los tokens.'};
+  }finally{usbPcBusy=false}
+}
+window.addEventListener('message',async event=>{
+  const message=event.data;
+  if(!usbWebToken||event.source!==$('#usbWebFrame').contentWindow||message?.channel!=='ews-usb-web'||message.token!==usbWebToken)return;
+  if(message.kind==='storage') {
+    if(!USB_WEB_KEYS.includes(message.key)||!(message.value===null||typeof message.value==='string')||String(message.value||'').length>12000)return;
+    try{const all=JSON.parse(localStorage.getItem(USB_WEB_STORAGE)||'{}');const route=$('#usbOllamaRoute').value;const saved=all[route]||{};
+      if(message.value===null)delete saved[message.key];else saved[message.key]=message.value;
+      all[route]=saved;localStorage.setItem(USB_WEB_STORAGE,JSON.stringify(all));}catch{}
+    return;
+  }
+  if(message.kind==='cancel'){usbWebControllers.get(message.id)?.abort();return}
+  if(message.kind!=='fetch'||!Number.isSafeInteger(message.id)||message.id<1)return;
+  if(usbWebControllers.has(message.id)||usbWebControllers.size>=4)return;
+  const controller=new AbortController();usbWebControllers.set(message.id,controller);
+  const token=usbWebToken;
+  const timer=setTimeout(()=>controller.abort(),message.path==='/api/models'?25000:195000);
+  let reply;
+  try{const result=await handleUsbWebRequest(message,controller.signal);reply={status:200,body:JSON.stringify(result)}}
+  catch(error){reply={error:error.name==='AbortError'?'Consulta cancelada o tiempo de espera agotado.':error.message};usbWebMessage(reply.error,true)}
+  finally{clearTimeout(timer);if(usbWebControllers.get(message.id)===controller)usbWebControllers.delete(message.id)}
+  if(token===usbWebToken)event.source.postMessage({...reply,channel:'ews-usb-web',token,id:message.id},'*');
+});
+$('#btnUsbWeb').addEventListener('click',openUsbWeb);
+$('#usbWebLoad').addEventListener('click',openUsbWeb);
+$('#usbWebClose').addEventListener('click',closeUsbWeb);
+$('#usbStartMain').addEventListener('click',()=>{
+  if(!serial.connected||state.running||firmwareBusy){usbWebMessage('Conecta la placa y termina la operación anterior.',true);return}
+  runInRam('# EspWebStudio: servicio\nexec(open("main.py").read())\n','main.py guardado');
+});
+document.addEventListener('keydown',event=>{if(event.key==='Escape'&&!$('#usbWebOverlay').classList.contains('hidden'))closeUsbWeb()});
+$('#usbOllamaRoute').addEventListener('change',()=>{
+  if(usbPcBusy){$('#usbOllamaRoute').value='pc';usbWebMessage('Espera a que termine la respuesta antes de cambiar el modo.',true);return}
+  closeUsbWeb();openOverlay('usbWebOverlay');usbWebMessage('Pulsa Cargar web. En modo PC usa localhost; en modo ESP32 usa la IP LAN de Ollama.');
+});
+$('#usbCreateChat').addEventListener('click',()=>{
+  const htmlDoc=newDoc('index.html',USB_CHAT_HTML,true);
+  const codeDoc=newDoc('main.py',$('#example-ollama-usb').textContent.trim()+'\n',true);
+  activateDoc(codeDoc.id);closeUsbWeb();
+  toast('Archivos creados como borradores. Guarda index.html y main.py en la placa, ejecuta main.py y pulsa Web por USB.','info',10000);
+});
+/* ---------- END USB WEB TRANSPORT ---------- */
+
 
 /* ============================================================================
    4. TERMINAL (xterm.js)
@@ -2963,11 +3835,12 @@ fitAddon.fit();
 
 serial.on('data', chunk => term.write(chunk));
 term.onData(data => {
+  if(usbWeb.claimed||usbWeb.pending){if(data==='\x03')serial.interrupt();return}
   if (serial.connected && serial.mode === 'terminal') serial.write(data);
 });
 window.addEventListener('resize', () => fitAddon.fit());
 
-term.writeln('\x1b[1;36m  EspWebStudio v3.6.1\x1b[0m');
+term.writeln('\x1b[1;36m  EspWebStudio v3.7.0\x1b[0m');
 term.writeln('\x1b[90m  IDE MicroPython para placas ESP32 (C3, S3, clásico…)\x1b[0m');
 term.writeln('');
 term.writeln('\x1b[33m▸ Conecta tu placa por USB con Chrome o Edge (Web Serial API)\x1b[0m');
@@ -3806,6 +4679,7 @@ async function runInRam(codeOverride=null, sourceName=null) {
   if (!code.endsWith('\n')) code += '\n';
 
   state.running = true;
+  serial.emit('service-stop'); // Ejecutar inicia un nuevo programa deliberadamente.
   setBusy(true, 'Ejecutando…');
   updateStatusBar();
   switchTermTab('output');
@@ -4862,6 +5736,7 @@ const BLOCK_PRESETS = {
   'code-iot-led-web':[{type:'mp_iot_led_web'}],
   'code-iot-telemetry':[{type:'mp_iot_telemetry'}],
   'code-iot-remote':[{type:'mp_iot_remote'}],
+  'code-ollama-usb':[{type:'mp_python_raw',sourceId:'ollama-usb'}],
   'code-local-convert':[{type:'mp_temp_table'}],
   'code-local-table':[{type:'mp_consumption_table'}],
   'code-chatbot':[{type:'mp_chatbot_demo'}],
@@ -5650,7 +6525,7 @@ serial.on('state', ({ connected, unexpected }) => {
   if (!connected) {
     sidebarDisconnected();
     $('#chipText').textContent = 'ESP32';
-    $('#versionText').textContent = 'v3.6.1';
+    $('#versionText').textContent = 'v3.7.0';
     if (unexpected) toast('La placa se desconectó (¿USB desenchufado?)', 'error', 5000);
   }
 });
@@ -5836,6 +6711,7 @@ $('#btnFirmwareFlash').addEventListener('click', runFirmwareFlash);
    10c. BIBLIOTECA DE EJEMPLOS INTEGRADA
    ============================================================================ */
 const EXAMPLES = [
+  { id:'ollama-usb',name:'main.py',title:'Chat Ollama: Wi-Fi y Web por USB',en:'Ollama chat: Wi-Fi and Web over USB',description:'Chat con selector de modelos, historial y ajustes; acceso USB desde el IDE sin compartir red.',enDescription:'Chat with model selection, history and settings; use the IDE USB connection across different networks.',steps:['Pulsa Web por USB → Crear archivos del chat; guarda main.py e index.html en la raíz de la placa.','Ejecuta main.py y abre Web por USB. En modo PC usa localhost:11434 y configura OLLAMA_ORIGINS.','En Wi-Fi usa http://IP:8080; cambia SSID y clave si corresponde.'],enSteps:['Use Web over USB → Create chat files; save main.py and index.html to the board root.','Run main.py and open Web over USB. PC mode uses localhost:11434 and needs OLLAMA_ORIGINS.','Wi-Fi mode uses http://IP:8080; set SSID and password as needed.'],warning:'La página debe incluir el protocolo USB cooperativo. Una web HTTP arbitraria no se convierte automáticamente. No se probó en una placa física.',enWarning:'The board app must implement the cooperative USB protocol; arbitrary HTTP apps do not work automatically. No physical board test yet.',icon:'monitor' },
   { id:'hello',name:'hola_mundo.py',title:'Hola mundo (No necesita placa)',en:'Hello world (No board required)',description:'Imprime Hola mundo con Python del navegador o de una placa conectada.',enDescription:'Print Hello world in the browser or on a connected board.',steps:['Pulsa Ejecutar o F5. Si no hay placa, se usa Python del navegador.','Mira la pestaña Salida.'],enSteps:['Press Run or F5. Without a board, Python runs in the browser.','Read the Output tab.'],icon:'terminal' },
   { id:'ap',name:'wifi_ap.py',title:'Modo AP',en:'AP mode',description:'Crea una red Wi-Fi propia con clave y muestra su dirección IP.',enDescription:'Create a Wi-Fi network and print its IP address.',steps:['Configura un SSID y una clave de al menos 8 caracteres.','Activa el AP y consulta su IP.'],enSteps:['Set an SSID and a password of at least 8 characters.','Enable the AP and print its IP.'],icon:'radio-tower' },
   { id:'sta',name:'wifi_sta.py',title:'Modo STA',en:'STA mode',description:'Conecta el ESP32 a tu red y muestra IP y señal recibida.',enDescription:'Connect to your Wi-Fi network and print IP and signal strength.',steps:['Cambia SSID y CLAVE.','Espera hasta 15 segundos; consulta RSSI solo después de conectar.'],enSteps:['Change SSID and password.','Wait up to 15 seconds; read RSSI only while connected.'],icon:'wifi' },
@@ -5942,7 +6818,7 @@ function openExamples() {
     ['groupGames',['chatbot','dungeon-master']],
     ['groupHardware',['pwm','adc','adc-alarm','i2c','spi','uart','neopixel','rgb-sequence','light-sleep','deep-sleep']],
     ['groupWifi',['ap','sta','scan','rssi','sta-rssi','http','ap-http','wifi-off','portal']],
-    ['groupIot',['iot-lamp','iot-led-web','iot-telemetry','iot-remote']],
+    ['groupIot',['iot-lamp','iot-led-web','iot-telemetry','iot-remote','ollama-usb']],
     ['groupRadio',['ble-beacon','ble-scan','ble-led','ble-stop','now-send','now-recv','now-monitor']],
     ['groupData',['nvs','files','file-log']]
   ];
@@ -6298,7 +7174,7 @@ function openAbout() { openDocs('about'); }
 /* ============================================================================
    15b. DOCUMENTACIÓN INTEGRADA
    ============================================================================ */
-const README_TEXT = `# EspWebStudio v3.6.1
+const README_TEXT = `# EspWebStudio v3.7.0
 
 IDE web para programar ESP32 con MicroPython. Se publica como un único **index.html** en GitHub Pages: no requiere instalar un editor, Python ni un servidor en la PC.
 
@@ -6308,11 +7184,11 @@ IDE web para programar ESP32 con MicroPython. Se publica como un único **index.
 - Instalación de firmware MicroPython desde la web mediante Web Serial y **esptool-js 0.7.0**.
 - Perfiles de flasheo: **ESP32-C3 / C3 Super Mini**, **ESP32 clásico** y **ESP32-S3**. El instalador detecta el chip, comprueba el perfil y la capacidad de la flash antes de escribir.
 - Opción separada para borrar por completo la flash durante la instalación inicial. La opción comienza desmarcada.
-- Biblioteca integrada con 46 ejemplos editables en Código y Bloques: Python local, chatbot, Dungeon Master, GPIO, sensores, energía, I²C, SPI, UART/USB, Wi-Fi/HTTP, BLE, ESP-NOW, NeoPixel, NVS, archivos y portal cautivo educativo.
+- Biblioteca integrada con 47 ejemplos editables en Código y Bloques: Python local, chatbot, Dungeon Master, GPIO, sensores, energía, I²C, SPI, UART/USB, Wi-Fi/HTTP, BLE, ESP-NOW, NeoPixel, NVS, archivos y portal cautivo educativo.
 - Estudio visual Blockly con **71 bloques propios** y categorías estándar de control, funciones, variables, lógica, matemáticas y texto. Genera MicroPython editable para ejecutarlo en RAM o guardarlo en la placa.
 - **31 proyectos visuales editables**: LED, botón, PWM, ADC, I²C, SPI, UART, AP, STA/RSSI, escaneo Wi-Fi, HTTP, BLE, ESP-NOW, NeoPixel, NVS y archivos. Todos aparecen en el catálogo general con una guía de pasos; cada uno se abre en la vista actual y tiene una representación editable en Bloques.
 - Tema oscuro y claro integrado en Blockly, perfil ESP32-C3 Super Mini que comprueba pines reservados y botón **Verificar placa** para detectar módulos del firmware.
-- **Código ↔ Bloques como vistas del mismo editor:** el cambio se realiza mediante pestañas, sin ventana superpuesta. Los 46 ejemplos conservan una representación visual. Las ediciones sencillas de campos generados también se reconocen; Python arbitrario se conserva íntegro en un bloque personalizado editable.
+- **Código ↔ Bloques como vistas del mismo editor:** el cambio se realiza mediante pestañas, sin ventana superpuesta. Los 47 ejemplos conservan una representación visual. Las ediciones sencillas de campos generados también se reconocen; Python arbitrario se conserva íntegro en un bloque personalizado editable.
 - Menú de **Accesibilidad** en la esquina superior derecha, junto a la paleta de comandos, con tamaño de interfaz, contraste, reducción de movimiento y tipografía OpenDyslexic; acceso por Alt+A. Selector de idioma Español / English en Ajustes para la interfaz, el catálogo y los bloques propios.
 - **Explorador plegable y recuperable** en Código y Bloques: el editor ocupa todo el ancho cuando se cierra. En móvil se abre sobre el editor y se cierra con el botón, el fondo o Esc. La guía de conexiones y la vista previa del Python generado pueden ocultarse por separado para liberar espacio. Perfil de placa y Ver ejemplos permanecen en la barra compartida de ambas vistas.
 - **Un solo botón Ejecutar (F5)**: si hay ESP32 conectada, ejecuta allí; si no hay placa, el Python puro se ejecuta con Pyodide en un Web Worker. Los imports de hardware se detectan antes de enviar el programa al intérprete local y muestran un aviso para conectar la placa.
@@ -6322,21 +7198,24 @@ IDE web para programar ESP32 con MicroPython. Se publica como un único **index.
 
 ## Declaración de IA y privacidad
 
-La [declaración de uso de IA](DECLARACION-IA.md) identifica el papel de Braian M. y la asistencia de OpenAI Codex por componente, las pruebas automatizadas realizadas y las validaciones físicas pendientes. También está disponible desde **Documentación → Uso de IA** dentro del HTML. La aplicación no integra un modelo de IA durante la programación o ejecución.
+La [declaración de uso de IA](DECLARACION-IA.md) identifica el papel de Braian M. y la asistencia de OpenAI Codex por componente, las pruebas automatizadas realizadas y las validaciones físicas pendientes. También está disponible desde **Documentación → Uso de IA** dentro del HTML. El IDE no envía el código del editor a un modelo de IA; el chat opcional consulta el servidor Ollama elegido por el usuario.
 
 La [guía de privacidad](PRIVACIDAD.md) explica qué se guarda en \`localStorage\`, el permiso Web Serial y las dependencias de CDN. **Los bloques y los borradores de Código pueden guardar claves Wi-Fi en este navegador**. Descarga el \`.py\` o exporta \`.json\` antes de usar **Ajustes → Borrar datos guardados**. El borrado recarga la página y no modifica la placa ni revoca el permiso serial del navegador. La reconexión automática está desactivada por defecto; la recuperación de borradores está activada y puede desactivarse en Ajustes. Al restaurar una pestaña se trata como borrador local: verifica la placa antes de guardarla.
-
-## Publicar en GitHub Pages
-
-1. Sube el contenido de esta carpeta al directorio raíz del repositorio. El único archivo imprescindible para ejecutar la aplicación es **index.html**; publica también el README, la declaración de IA, la guía de privacidad, la guía IoT y la licencia para ofrecer documentación visible en GitHub.
-2. En **Settings → Pages**, publica **main** y **/(root)**.
-3. Abre la URL HTTPS de Pages en **Chrome o Edge de escritorio**, conecta la placa por USB y autoriza el puerto cuando el navegador lo solicite.
 
 La interfaz se sirve como archivo estático. Las bibliotecas del editor y del flasheador se cargan desde CDN, por lo que se necesita Internet para abrirlas por primera vez. El firmware .bin se selecciona desde el disco del usuario; la aplicación no lo incluye ni lo envía a un servidor.
 
 El botón **Bloques** carga Blockly 13.3.0 desde CDN cuando se abre la vista visual. Ejecutar un programa de Python puro sin placa carga Pyodide v314.0.7 bajo demanda desde CDN; la fuente OpenDyslexic también se descarga bajo demanda. Todo el código de la aplicación y los ejemplos siguen dentro de **index.html**; no hace falta instalar programas en la PC. El MicroPython generado se ejecuta en el ESP32 conectado mediante el mismo botón **Conectar** del IDE. Para ejemplos con \`input()\` en el navegador se abre un cuadro de respuesta dentro de la página, conectado al Web Worker.
 
 Los archivos \`ejemplos/*.py\` son copias opcionales de programas integrados en el HTML. \`.github/workflows/ci.yml\` y \`tests/\` sirven para desarrollo y revisión: la página publicada solo necesita \`index.html\`. Para comprobar una modificación antes de subirla, ejecuta \`python -m unittest discover -s tests -v\` y \`node tests/test_runtime.js\` desde la raíz del paquete. Las pruebas no sustituyen una comprobación en una placa real.
+
+
+## Web por USB y chat con Ollama
+
+El botón **Web por USB** reutiliza la conexión del IDE para abrir la página del ESP32 dentro de un panel, sin que PC y placa compartan Wi-Fi. **Crear archivos del chat** abre \`main.py\` e \`index.html\` como borradores: guarda ambos en la raíz de la placa, ejecuta \`main.py\` y carga la web. En usos posteriores, **Iniciar main.py guardado** arranca el servicio sin volver a subirlo.
+
+El selector superior permite consultar Ollama desde **esta PC**, usando \`http://localhost:11434\`, o desde **el Wi-Fi del ESP32**, usando la IP LAN de Ollama. Se conservan selector de modelos, historial, system prompt, temperatura, top-p, contexto, tokens y acceso HTTP por Wi-Fi. Para modo PC configura \`OLLAMA_ORIGINS=https://braianm-dev.github.io\`, reinicia Ollama y permite acceso local si el navegador lo solicita.
+
+Consulta la [guía completa del chat USB](ejemplos/chat_ollama/README.md). Requiere el protocolo cooperativo del ejemplo; no transporta automáticamente cualquier servidor HTTP. No necesita un segundo puerto USB ni un programa puente instalado en la PC. La validación física en ESP32-C3 queda pendiente.
 
 ## Usar todo el ancho del editor
 
@@ -6452,6 +7331,8 @@ Configura SSID y clave de una red de prueba propia y conecta únicamente disposi
 EspWebStudio se distribuye bajo licencia **MIT** (archivo LICENSE). La transparencia sobre asistencia de IA consta en [DECLARACION-IA.md](DECLARACION-IA.md). Usa bibliotecas de terceros con sus propias licencias: esptool-js de Espressif (**Apache-2.0**), Blockly (**Apache-2.0**), CodeMirror, xterm.js y Lucide. La ejecución local utiliza Pyodide y la fuente opcional OpenDyslexic se distribuye bajo SIL OFL 1.1. Blockly, Lucide 1.18.0 y el flasheador se cargan bajo versiones fijas; el resto de dependencias del editor también se sirven por CDN.
 
 Documentación técnica: [Blockly](https://developers.google.com/blockly/guides/create-custom-blocks/code-generation/overview), [ESP32-C3 GPIO](https://docs.espressif.com/projects/esp-idf/en/stable/esp32c3/api-reference/peripherals/gpio.html), [MicroPython ESP-NOW](https://docs.micropython.org/en/latest/library/espnow.html), [MicroPython BLE](https://docs.micropython.org/en/latest/library/bluetooth.html), [esptool-js](https://github.com/espressif/esptool-js), [Web Serial](https://developer.chrome.com/docs/capabilities/serial), [Raw REPL](https://docs.micropython.org/en/latest/reference/repl.html), [Pyodide en Web Worker](https://pyodide.org/en/stable/usage/webworker.html) y [OpenDyslexic](https://github.com/antijingoist/opendyslexic).
+
+
 `;
 
 const LICENSE_TEXT = `MIT License
@@ -6476,7 +7357,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 `;
-const ABOUT_TEXT = `EspWebStudio v3.6.1
+const ABOUT_TEXT = `EspWebStudio v3.7.0
 IDE MicroPython para placas ESP32 (C3 Super Mini, S3, clasico...)
 
 Un IDE web 100% cliente, sin backend, que se comunica con tu placa
@@ -6490,7 +7371,7 @@ integrada viven en UN UNICO archivo HTML.
 - Ejecucion en RAM con interrupcion y guardado seguro (Base64)
 - Instalador web de MicroPython (C3, ESP32 y S3)
 - Ejemplos WiFi AP/STA/RSSI, LED, UART, chatbot, Dungeon Master y diagnostico
-- Estudio visual: 71 bloques ESP32, 46 ejemplos en Codigo/Bloques,
+- Estudio visual: 71 bloques ESP32, 47 ejemplos en Codigo/Bloques,
   ejecucion local con Pyodide, perfil C3 y proyectos JSON
 
 Dependencias (CDN): CodeMirror 5, xterm.js, Blockly 13.3.0, Lucide Icons,
@@ -6499,7 +7380,7 @@ esptool-js 0.7.0 (Apache-2.0).
 Licencia: MIT. Consulta las pestañas Uso de IA y Privacidad.
 Hecho con cariño para la comunidad maker.`;
 
-const AI_TEXT_ES = `# Declaración de uso de inteligencia artificial — EspWebStudio v3.6.1
+const AI_TEXT_ES = `# Declaración de uso de inteligencia artificial — EspWebStudio v3.7.0
 
 **Fecha:** 6 de octubre de 2026  
 **Dirección y crédito del proyecto:** Braian M.  
@@ -6521,7 +7402,7 @@ La selección de objetivos, la revisión final antes de publicar y la validació
 
 ## Uso de IA al ejecutar EspWebStudio
 
-La aplicación entregada **no incorpora un asistente de IA ni envía intencionalmente el código del editor a un modelo de IA**. El Python local se ejecuta con Pyodide en el navegador; los programas de MicroPython se envían a la placa por Web Serial. La página obtiene bibliotecas y, si se activa, la fuente OpenDyslexic desde servicios externos. El código que escriba el usuario puede realizar sus propias conexiones de red. Consulta [PRIVACIDAD.md](PRIVACIDAD.md) para los datos locales, las dependencias y las opciones de borrado.
+El IDE no envía el código del editor a un modelo de IA. El chat USB opcional envía mensajes y ajustes al servidor Ollama elegido por el usuario. El Python local se ejecuta con Pyodide en el navegador; los programas de MicroPython se envían a la placa por Web Serial. La página obtiene bibliotecas y, si se activa, la fuente OpenDyslexic desde servicios externos. El código que escriba el usuario puede realizar sus propias conexiones de red. Consulta [PRIVACIDAD.md](PRIVACIDAD.md) para los datos locales, las dependencias y las opciones de borrado.
 
 ## Comprobación y actualización
 
@@ -6530,7 +7411,9 @@ El código generado o sugerido por IA puede contener errores. Antes de usar la p
 **Licencia de EspWebStudio:** MIT, según [LICENSE](LICENSE). Esta declaración informa sobre el proceso de creación y no sustituye los avisos de licencia de las dependencias.
 `;
 
-const AI_TEXT_EN=`AI USE DISCLOSURE — EspWebStudio v3.6.1
+const AI_TEXT_EN=`
+The optional USB chat sends user messages and settings to the selected Ollama server. It does not send editor source code. Physical board validation is pending.
+AI USE DISCLOSURE — EspWebStudio v3.7.0
 Project direction and credit: Braian M.
 Assistant used in this stage: OpenAI Codex.
 
@@ -6552,7 +7435,9 @@ may make its own network requests.
 
 Full statement (Spanish): DECLARACION-IA.md in the download package.`;
 
-const PRIVACY_TEXT_ES = `# Privacidad y datos locales — EspWebStudio v3.6.1
+const PRIVACY_TEXT_ES = `
+El chat USB opcional envía mensajes y ajustes al servidor Ollama elegido. Su dirección, modelo y parámetros se guardan en espwebstudio.usb.web.v1; la conversación permanece en la sesión. El borrado de datos también elimina esos ajustes.
+# Privacidad y datos locales — EspWebStudio v3.7.0
 
 EspWebStudio se publica como una página estática. No tiene un servidor propio para almacenar proyectos ni una función de telemetría integrada. Esta descripción se refiere al código de la aplicación entregada; los programas que escriba o ejecute cada persona pueden conectarse a servicios externos por su cuenta.
 
@@ -6577,7 +7462,9 @@ El formulario del portal AP y los paneles IoT usan **HTTP sin cifrado** dentro d
 La página necesita Internet la primera vez que carga sus bibliotecas externas. Ejecutar Python puro sin placa carga Pyodide bajo demanda; activar la tipografía para dislexia carga OpenDyslexic. Si necesitas un entorno sin dependencias de CDN, hace falta empaquetar y alojar esas bibliotecas por separado; el \`index.html\` entregado no incluye sus binarios.
 `;
 
-const PRIVACY_TEXT_EN=`PRIVACY AND LOCAL DATA — EspWebStudio v3.6.1
+const PRIVACY_TEXT_EN=`
+Optional USB chat settings are stored under espwebstudio.usb.web.v1. Conversation history is session-only; prompts and selected history go to the user-selected Ollama endpoint.
+PRIVACY AND LOCAL DATA — EspWebStudio v3.7.0
 
 - No project hosting backend or built-in telemetry.
 - Settings and Blocks projects live in this browser's localStorage. Blocks
@@ -6599,7 +7486,9 @@ Download the .py and export JSON first if you want to keep them.
 
 Full details (Spanish): PRIVACIDAD.md in the download package.`;
 
-const IOT_TEXT_ES = `# Guía IoT — EspWebStudio v3.6.1
+const IOT_TEXT_ES = `
+Web por USB abre la página cooperativa del ESP32 por el mismo cable del IDE. Usa Crear archivos del chat, guarda main.py e index.html y ejecuta el servicio. Ollama desde Esta PC utiliza localhost; requiere OLLAMA_ORIGINS con el origen del IDE. La opción ESP32 conserva las consultas por Wi-Fi. Guía completa: ejemplos/chat_ollama/README.md.
+# Guía IoT — EspWebStudio v3.7.0
 
 Para editar programas largos en Código o Bloques, usa **Ocultar explorador** en la fila de vistas. **Mostrar explorador** vuelve a abrir el panel de archivos cuando quieras guardar \`main.py\` o revisar \`iot_lampara.json\`. En móvil, el panel aparece sobre el editor y se cierra con su botón, el fondo o Esc; ocultarlo no cambia los archivos de la placa.
 
@@ -6859,3 +7748,4 @@ window.EspWebStudio = { serial, term, cm, state, settings, toast, runInRam, sync
 </script>
 </body>
 </html>
+

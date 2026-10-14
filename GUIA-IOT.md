@@ -1,4 +1,4 @@
-# Guía IoT — EspWebStudio v3.6.1
+# Guía IoT — EspWebStudio v3.7.0
 
 Para editar programas largos en Código o Bloques, usa **Ocultar explorador** en la fila de vistas. **Mostrar explorador** vuelve a abrir el panel de archivos cuando quieras guardar `main.py` o revisar `iot_lampara.json`. En móvil, el panel aparece sobre el editor y se cierra con su botón, el fondo o Esc; ocultarlo no cambia los archivos de la placa.
 
@@ -39,3 +39,12 @@ Los servicios HTTP del panel LED y la telemetría también pueden guardarse como
 Hay un solo botón. Si el IDE tiene una ESP32 conectada, envía el programa a MicroPython. Si no hay placa, inspecciona imports y operaciones de hardware: el Python puro se ejecuta con Pyodide en el navegador y el código que necesita ESP32 muestra un aviso para conectar. Esta clasificación es una ayuda estática y no puede interpretar todas las importaciones dinámicas; ante un caso especial conecta la placa y ejecuta allí.
 
 Fuentes técnicas: [WLAN de MicroPython](https://docs.micropython.org/en/latest/library/network.WLAN.html), [referencia ESP32](https://docs.micropython.org/en/latest/esp32/quickref.html) y [socket de MicroPython](https://docs.micropython.org/en/latest/library/socket.html).
+
+
+## Web por USB y chat con Ollama
+
+El botón **Web por USB** reutiliza la conexión del IDE para abrir la página del ESP32 dentro de un panel, sin que PC y placa compartan Wi-Fi. **Crear archivos del chat** abre `main.py` e `index.html` como borradores: guarda ambos en la raíz de la placa, ejecuta `main.py` y carga la web. En usos posteriores, **Iniciar main.py guardado** arranca el servicio sin volver a subirlo.
+
+El selector superior permite consultar Ollama desde **esta PC**, usando `http://localhost:11434`, o desde **el Wi-Fi del ESP32**, usando la IP LAN de Ollama. Se conservan selector de modelos, historial, system prompt, temperatura, top-p, contexto, tokens y acceso HTTP por Wi-Fi. Para modo PC configura `OLLAMA_ORIGINS=https://braianm-dev.github.io`, reinicia Ollama y permite acceso local si el navegador lo solicita.
+
+Consulta la [guía completa del chat USB](ejemplos/chat_ollama/README.md). Requiere el protocolo cooperativo del ejemplo; no transporta automáticamente cualquier servidor HTTP. No necesita un segundo puerto USB ni un programa puente instalado en la PC. La validación física en ESP32-C3 queda pendiente.

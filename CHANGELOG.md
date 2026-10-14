@@ -1,3 +1,11 @@
+# EspWebStudio v3.7.0
+
+- Web por USB integrada al mismo Web Serial del IDE; iframe aislado y tramas con ACK.
+- Chat Ollama con lista de modelos, ajustes e historial, conservando HTTP por Wi-Fi.
+- Modo PC con localhost y modo ESP32 con su red; archivos del chat integrados en el HTML.
+- Servicio sin límite Raw REPL, pruebas de transferencia USB y documentación de OLLAMA_ORIGINS.
+- Validación física pendiente.
+
 # Cambios de EspWebStudio
 
 ## v3.6.1 — 6 de octubre de 2026
@@ -36,3 +44,4 @@ Se verificó la estructura y el comportamiento de alternancia mediante pruebas a
 - Guía IoT integrada en el HTML y disponible como documento. README, privacidad y declaración de IA actualizados.
 
 La lógica del portal y de ejecución se probó mediante simulaciones, además de revisar sintaxis y generación. **No hubo prueba física** de Wi-Fi, GPIO, portal automático, flasheo o Web Serial con una placa real.
+

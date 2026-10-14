@@ -1,4 +1,4 @@
-# Privacidad y datos locales — EspWebStudio v3.6.1
+# Privacidad y datos locales — EspWebStudio v3.7.0
 
 EspWebStudio se publica como una página estática. No tiene un servidor propio para almacenar proyectos ni una función de telemetría integrada. Esta descripción se refiere al código de la aplicación entregada; los programas que escriba o ejecute cada persona pueden conectarse a servicios externos por su cuenta.
 
@@ -21,3 +21,8 @@ El botón **Borrar datos guardados** avisa antes de actuar y elimina las copias 
 El formulario del portal AP y los paneles IoT usan **HTTP sin cifrado** dentro de la red local. La contraseña del Wi-Fi se transmite por ese AP al configurar la lámpara y puede quedar almacenada en la placa si marcas Recordar. El panel de la lámpara requiere un token aleatorio, pero **HTTP tampoco cifra ese token**; otros paneles de ejemplo (LED web y telemetría) no autentican. No expongas sus puertos a Internet y usa únicamente una red propia de confianza. Consulta [GUIA-IOT.md](GUIA-IOT.md).
 
 La página necesita Internet la primera vez que carga sus bibliotecas externas. Ejecutar Python puro sin placa carga Pyodide bajo demanda; activar la tipografía para dislexia carga OpenDyslexic. Si necesitas un entorno sin dependencias de CDN, hace falta empaquetar y alojar esas bibliotecas por separado; el `index.html` entregado no incluye sus binarios.
+
+
+## Chat USB opcional
+
+La web de la placa se lee por USB dentro de un iframe aislado. Si eliges Ollama desde la PC, el navegador envía únicamente los mensajes, el historial elegido, el prompt y los ajustes al servidor Ollama indicado. No se envía el código del editor. En modo ESP32 esas consultas las realiza la placa. `espwebstudio.usb.web.v1` guarda dirección, modelo y ajustes; no guarda el historial de conversación. **Borrar datos guardados** también elimina esa clave. Los borradores creados con los archivos del chat pueden incluir claves Wi-Fi. La página del chat conserva su propio almacenamiento al abrirse por IP desde otro origen.

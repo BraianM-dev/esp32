@@ -1,4 +1,4 @@
-# Declaración de uso de inteligencia artificial — EspWebStudio v3.6.1
+# Declaración de uso de inteligencia artificial — EspWebStudio v3.7.0
 
 **Fecha:** 6 de octubre de 2026  
 **Dirección y crédito del proyecto:** Braian M.  
@@ -27,3 +27,8 @@ La aplicación entregada **no incorpora un asistente de IA ni envía intencional
 El código generado o sugerido por IA puede contener errores. Antes de usar la placa, confirma el modelo, los pines, el firmware y el comportamiento del programa. Revisa especialmente las operaciones que escriben flash, crean redes o reinician el dispositivo. Actualiza esta declaración si cambian sustancialmente las herramientas, las aportaciones o la forma en que la aplicación procesa datos.
 
 **Licencia de EspWebStudio:** MIT, según [LICENSE](LICENSE). Esta declaración informa sobre el proceso de creación y no sustituye los avisos de licencia de las dependencias.
+
+
+## Función opcional de chat en v3.7.0
+
+El chat Ollama permite enviar explícitamente mensajes y parámetros al servidor elegido por el usuario, mediante la PC o la red de la placa. Esta función no manda el código del editor a un modelo. OpenAI Codex asistió en el protocolo USB, el adaptador de página, la preparación del chat, la documentación y las pruebas automatizadas. No se verificó físicamente en una placa.
